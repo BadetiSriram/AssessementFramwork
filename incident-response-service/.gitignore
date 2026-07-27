@@ -1,0 +1,17 @@
+# Secrets: never commit real local config (copy from *.example instead)
+**/application-local.yml
+.env
+*.env
+!*.env.example
+
+# Build output
+target/
+*.class
+
+# IDE / OS
+.idea/
+*.iml
+.vscode/
+*.stackdump
+.DS_Store
+Thumbs.db

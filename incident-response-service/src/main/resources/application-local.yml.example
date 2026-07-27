@@ -1,0 +1,27 @@
+# Copy to `application-local.yml` and fill in real values (that file is git-ignored).
+# Run with:  mvn spring-boot:run "-Dspring-boot.run.profiles=local"
+#
+# PostgreSQL 17 must be running and the database/role must exist (see README):
+#   CREATE ROLE incident_response LOGIN PASSWORD 'incident_response';
+#   CREATE DATABASE incident_response OWNER incident_response;
+#   -- then, connected to incident_response:
+#   GRANT ALL ON SCHEMA public TO incident_response; ALTER SCHEMA public OWNER TO incident_response;
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/incident_response
+    username: incident_response
+    password: incident_response
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+# Camunda 8.9 SaaS cluster credentials — GET THESE FROM YOUR CAMUNDA CONSOLE. Never commit real values.
+camunda:
+  client:
+    mode: saas
+    cloud:
+      cluster-id: <YOUR_CLUSTER_ID>
+      region: <YOUR_REGION>
+    auth:
+      client-id: <YOUR_CLIENT_ID>
+      client-secret: <YOUR_CLIENT_SECRET>
