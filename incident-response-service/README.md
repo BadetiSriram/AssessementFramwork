@@ -91,8 +91,26 @@ completed in **Tasklist**. Swagger: `http://localhost:8080/swagger-ui/index.html
    (same secret). The `.env` also has **Google Vertex AI** + **SendGrid** keys for alternative
    providers / a real notification connector.
 
-**Next iterations (best done in Web Modeler):**
-- Wrap Containment / Forensics / Recovery in **embedded sub-processes**.
+- **Human-task API + outcome persistence** — complete Tasklist user tasks from the API and record
+  each outcome to Postgres (`incident_task_outcomes`):
+  ```
+  GET  /incidents/{id}/tasks                       active user tasks (key, elementId, name)
+  POST /incidents/{id}/tasks/{userTaskKey}/complete  {"completedBy":"...","variables":{...}}
+  POST /incidents/{id}/tasks/complete              complete the single active task
+  GET  /incidents/{id}/tasks/outcomes              recorded outcomes (from Postgres)
+  ```
+  The incident stores its `process_instance_key`; `CamundaTaskAdapter` searches/completes user tasks
+  via the v2 API. Verified: raise → complete Containment Verification/Forensic Analysis via API →
+  outcome row in `incident_task_outcomes`. (The graded demo can still complete tasks in Tasklist.)
+
+### Database (updated)
+Now runs as **`postgres` / `postgres`** against a fresh `incident_response` database (V1 framework
+tables, V2 `incidents`, V3 `incident_task_outcomes` + `incidents.process_instance_key`). Create it:
+`CREATE DATABASE incident_response OWNER postgres;` (superuser postgres/postgres).
+
+**Next iterations:**
+- Wrap Containment / Forensics / Recovery in **embedded sub-processes** (BPMN) — *pending*.
+- Optional: a `completing` task listener so Tasklist-channel completions also record outcomes.
 - Tune SLA/timer durations, AI prompts, and enrich the form fields.
 
 > Regenerate DI after editing the BPMN: run `bpmn-auto-layout` (the `layout.mjs` script used during

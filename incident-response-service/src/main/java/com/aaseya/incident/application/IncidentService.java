@@ -43,9 +43,10 @@ public class IncidentService {
     @Transactional
     public Incident raiseIncident(String title, String source, boolean forceIsolationFailure) {
         Incident incident = Incident.raise(title, source);
-        incidentRepository.save(incident);
+        // save() merges (id is assigned) and returns the managed instance — use it, not `incident`.
+        Incident saved = incidentRepository.save(incident);
 
-        processService.start(StartProcessCommand.withVariables(
+        long processInstanceKey = processService.start(StartProcessCommand.withVariables(
                 PROCESS_ID,
                 incident.getBusinessKey(),
                 Map.of(
@@ -63,7 +64,8 @@ public class IncidentService {
                         // / deploy-patch — inner element IDs of the ad-hoc sub-process).
                         "responseActions", List.of("Task_BlockIp", "Task_RevokeCredentials"))));
 
-        return incident;
+        saved.setProcessInstanceKey(processInstanceKey);
+        return saved;
     }
 
     @Transactional(readOnly = true)

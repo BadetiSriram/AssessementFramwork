@@ -58,6 +58,10 @@ public class Incident extends AuditableEntity<IncidentStatus> {
     @Column(name = "status", nullable = false)
     private IncidentStatus status = IncidentStatus.RAISED;
 
+    /** Camunda process instance key, set once the incident-response process is started. */
+    @Column(name = "process_instance_key")
+    private Long processInstanceKey;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
     @Column(name = "updated_at", nullable = false)
@@ -157,5 +161,13 @@ public class Incident extends AuditableEntity<IncidentStatus> {
 
     public IncidentStatus status() {
         return status;
+    }
+
+    public Long getProcessInstanceKey() {
+        return processInstanceKey;
+    }
+
+    public void setProcessInstanceKey(Long processInstanceKey) {
+        this.processInstanceKey = processInstanceKey;
     }
 }
