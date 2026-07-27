@@ -121,6 +121,71 @@ curl http://localhost:8080/orders/<id>            # status flips NEW -> RESERVED
    makes the Camunda SDK upload it on startup. Placed in `infrastructure.camunda` to satisfy rule #2.
 3. **Database switched from H2 to PostgreSQL 17** in `application-local.yml` (see "How to run").
 
+## Operate & Tasklist sample APIs (Camunda 8.9 Orchestration Cluster API v2)
+
+In Camunda 8.9 the separate **Operate** and **Tasklist** REST APIs were consolidated into the
+single **Orchestration Cluster REST API v2**, and the Java `CamundaClient` speaks it directly —
+so there is no separate Operate/Tasklist client or Swagger base-URL to configure. These sample
+endpoints demonstrate it, following the layering `web → application → infrastructure.camunda`:
+
+```
+web/OrchestrationController.java                     REST endpoints (calls application only)
+application/OrchestrationService.java                facade
+infrastructure/camunda/CamundaOrchestrationAdapter.java   ONLY class importing io.camunda.client
+web/dto/ ProcessInstanceView, VariableView, UserTaskView, VariablesRequest, AssignRequest, StartProcessRequest
+config/OpenApiConfig.java                            Swagger/OpenAPI title
+infrastructure/camunda/worker/TestJobWorker.java + TestJobVars.java   sample job worker (type "TestJobworker")
+resources/processes/order-approval.bpmn             process with a NATIVE user task (<zeebe:userTask/>)
+resources/processes/Usertask and job worker testing.bpmn   Process_1ef326b: job worker + user task
+```
+
+Endpoints:
+```
+# Start a process (used to reach the user task)
+POST /orchestration/process-instances                 {"processDefinitionId":"order-approval","variables":{...}}
+
+# Operate-style
+GET  /orchestration/process-instances?processDefinitionId=order-fulfillment&limit=20
+GET  /orchestration/process-instances/{key}
+GET  /orchestration/process-instances/{key}/variables
+PUT  /orchestration/process-instances/{key}/variables  {"variables":{...}}
+
+# Tasklist-style
+GET  /orchestration/user-tasks?processInstanceKey={key}&assignee={user}&limit=20
+POST /orchestration/user-tasks/{key}/assign            {"assignee":"sriram.badeti"}
+POST /orchestration/user-tasks/{key}/complete          {"variables":{"approved":true}}
+
+# Complete the active user task by PROCESS INSTANCE KEY (as you have it from Operate) —
+# finds the waiting CREATED task for the instance and completes it (retries for search lag).
+POST /orchestration/process-instances/{key}/complete-user-task   {"variables":{...}}
+```
+
+All BPMNs in `resources/processes/*.bpmn` are deployed on startup (`CamundaDeploymentConfig`,
+wildcard `classpath*:processes/*.bpmn`):
+- `order-fulfillment` — service task / job worker (`reserve-inventory`), used by `/orders`.
+- `order-approval` — a single native user task, used to test `assign`/`complete`.
+- `Usertask and job worker testing` (process id `Process_1ef326b`) — start → **service task
+  `TestJobworker`** (sample job worker) → **native user task** → end. Used to test the sample
+  worker + complete-by-instance-key together.
+
+Only a **native** user task (`<zeebe:userTask/>`) appears in the v2 user-task API; a job-worker
+user task would not.
+
+**Job workers** (`infrastructure.camunda.worker`, extend the framework `BaseWorker`):
+- `ReserveInventoryWorker` (type `reserve-inventory`) — delegates to `OrderService`.
+- `TestJobWorker` (type `TestJobworker`) — a minimal sample: no required input (empty
+  `TestJobVars` record) and emits a few sample output variables, then completes.
+
+**Read-after-write lag:** the v2 search/query API (`newXxxSearchRequest`) reads from secondary
+storage populated by an exporter, so a search issued immediately after a write (assign/complete/
+start) may show stale data for a few seconds. The command itself is applied synchronously; only the
+read is eventually consistent.
+
+### Swagger / OpenAPI
+`springdoc-openapi-starter-webmvc-ui:3.0.1` (the Spring Boot 4-compatible line) is on the classpath:
+- Swagger UI: `http://localhost:8080/swagger-ui/index.html`
+- OpenAPI JSON: `http://localhost:8080/v3/api-docs`
+
 ## Framework defect this sample exposed
 
 `OrderService` is the **first code anywhere that injects `ProcessService`**, and

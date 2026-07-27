@@ -14,6 +14,6 @@ import org.springframework.context.annotation.Configuration;
  * {@code io.camunda.client..}, which ArchUnit rule #2 permits only in that package.
  */
 @Configuration
-@Deployment(resources = "classpath:processes/order-fulfillment.bpmn")
+@Deployment(resources = "classpath*:processes/*.bpmn")
 public class CamundaDeploymentConfig {
 }

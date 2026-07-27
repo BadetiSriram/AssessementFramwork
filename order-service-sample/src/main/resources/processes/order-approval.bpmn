@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  id="order-approval-definitions"
+                  targetNamespace="http://bpmn.io/schema/bpmn">
+  <!--
+    Minimal process that contains a single NATIVE Camunda user task (marked with
+    <zeebe:userTask/>). Native user tasks are managed by the engine and appear in the
+    Camunda 8.9 Orchestration Cluster API v2 (newUserTaskSearchRequest / complete / assign),
+    which is what OrchestrationController exercises. A plain <bpmn:userTask> WITHOUT
+    <zeebe:userTask/> would instead be a job-worker task and would NOT show up there.
+
+    Flow:  start -> "Approve Order" (user task) -> end
+  -->
+  <bpmn:process id="order-approval" name="Order Approval" isExecutable="true">
+    <bpmn:startEvent id="StartEvent_1">
+      <bpmn:outgoing>Flow_start_to_approve</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:userTask id="Task_ApproveOrder" name="Approve Order">
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_start_to_approve</bpmn:incoming>
+      <bpmn:outgoing>Flow_approve_to_end</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="EndEvent_1">
+      <bpmn:incoming>Flow_approve_to_end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_start_to_approve" sourceRef="StartEvent_1" targetRef="Task_ApproveOrder" />
+    <bpmn:sequenceFlow id="Flow_approve_to_end" sourceRef="Task_ApproveOrder" targetRef="EndEvent_1" />
+  </bpmn:process>
+</bpmn:definitions>
