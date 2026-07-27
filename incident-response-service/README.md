@@ -75,10 +75,25 @@ completed in **Tasklist**. Swagger: `http://localhost:8080/swagger-ui/index.html
   all four parallel branches (incl. ad-hoc) with no incidents, then waits at the human tasks (which
   now show forms in Tasklist).
 
-**Next iterations (best done in Web Modeler):**
-- Replace the Triage and Post-Incident-Report workers with **AI connector** tasks.
-- Wrap Containment / Forensics / Recovery in **embedded sub-processes**.
-- Tune SLA/timer durations and enrich the form fields.
+- **AI connector steps** — threat triage (`Task_TriageAI`) and post-incident report
+  (`Task_ReportAI`) are **OpenAI** calls via the HTTP REST connector (`io.camunda:http-json:1`):
+  prompts built from process variables, result mapped to `triageReport` / `postIncidentReport`,
+  retries, and an **error boundary that falls back to the equivalent job worker** so the flow always
+  completes. Auth uses the `{{secrets.OPENAI_API_TOKEN}}` cluster secret. Verified: an incident runs
+  through the AI triage step (or its fallback) to CLASSIFIED with no incidents.
 
-> Regenerate DI after editing the BPMN: `npx bpmn-auto-layout` via a small script (see the
-> `layout.mjs` used during setup), or just re-open in Web Modeler.
+### AI connector setup (to make the AI steps actually call OpenAI)
+1. In **Camunda Console → your cluster → Connector secrets**, add `OPENAI_API_TOKEN` = your OpenAI
+   key (from the git-ignored `*.env`).
+2. Without the secret, the AI tasks error → the boundary catches it → the fallback worker runs and
+   the flow still completes. With it, the AI produces real triage / report text.
+3. Swap for the dedicated **OpenAI** or **AI Agent** connector template in Web Modeler if preferred
+   (same secret). The `.env` also has **Google Vertex AI** + **SendGrid** keys for alternative
+   providers / a real notification connector.
+
+**Next iterations (best done in Web Modeler):**
+- Wrap Containment / Forensics / Recovery in **embedded sub-processes**.
+- Tune SLA/timer durations, AI prompts, and enrich the form fields.
+
+> Regenerate DI after editing the BPMN: run `bpmn-auto-layout` (the `layout.mjs` script used during
+> setup), or re-open in Web Modeler. NEVER commit the `*.env` (it holds live API keys — rotate them).

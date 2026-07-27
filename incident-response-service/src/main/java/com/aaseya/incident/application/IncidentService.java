@@ -54,6 +54,9 @@ public class IncidentService {
                         "title", incident.getTitle(),
                         "source", incident.getSource(),
                         "forceIsolationFailure", forceIsolationFailure,
+                        // Written by the AI triage connector; initialized so it always exists even
+                        // if the AI step is skipped/fails.
+                        "triageReport", "",
                         // Ad-hoc response actions the incident commander activates. Defaulted so
                         // the flow runs end-to-end; at runtime the commander selects these via the
                         // ad-hoc sub-process API as findings emerge (block-ip / revoke-credentials
