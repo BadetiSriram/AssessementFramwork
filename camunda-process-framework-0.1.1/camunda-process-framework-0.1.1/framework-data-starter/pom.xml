@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aaseya.camunda</groupId>
+    <artifactId>camunda-process-framework</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>framework-data-starter</artifactId>
+  <packaging>jar</packaging>
+
+  <name>framework-data-starter</name>
+  <description>
+    Spring Boot auto-configuration for JPA data access and Flyway schema management.
+    Provides opinionated DataSource defaults and migration baseline conventions so
+    consuming services can focus on domain persistence without repetitive setup.
+  </description>
+
+  <dependencies>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter</artifactId>
+    </dependency>
+
+    <!-- Spring Data JPA — services opt in; kept provided so the starter can
+         reference JPA types at compile time without forcing a DataSource
+         on every consumer. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-jpa</artifactId>
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- Flyway — optional; consumers that manage schema migrations include it
+         explicitly to activate the auto-configuration. -->
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-core</artifactId>
+      <optional>true</optional>
+    </dependency>
+
+    <!-- spring-web: optional; enables audit stamping of createdBy/updatedBy from
+         the current HTTP request via RequestContextHolder. Services without
+         spring-web get graceful no-op behavior in AuditColumnListener. -->
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-web</artifactId>
+      <optional>true</optional>
+    </dependency>
+
+    <!-- jakarta.servlet-api: optional; required at compile time by RequestContextHolder path in AuditColumnListener. -->
+    <dependency>
+      <groupId>jakarta.servlet</groupId>
+      <artifactId>jakarta.servlet-api</artifactId>
+      <optional>true</optional>
+    </dependency>
+
+    <!-- Configuration metadata processor — generates spring-configuration-metadata.json
+         so IDEs offer completion for framework.data.* properties. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-configuration-processor</artifactId>
+      <optional>true</optional>
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- Test -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+  </dependencies>
+
+</project>

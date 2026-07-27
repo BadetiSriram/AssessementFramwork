@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aaseya.camunda</groupId>
+    <artifactId>camunda-process-framework</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>framework-camunda-starter</artifactId>
+  <packaging>jar</packaging>
+
+  <name>framework-camunda-starter</name>
+  <description>
+    Spring Boot auto-configuration for CamundaClient in SaaS mode. Provides sensible
+    defaults for worker polling, retry backoff, and job-active limits, and wires the
+    standard framework infrastructure beans (ProcessService, VariableMapper,
+    IdempotencyGuard, OutboxRelay) so consuming services get them out of the box.
+  </description>
+
+  <dependencies>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter</artifactId>
+    </dependency>
+
+    <!-- Camunda 8.9 Spring Boot Starter — provides CamundaClient auto-config.
+         Version managed in parent dependencyManagement. -->
+    <dependency>
+      <groupId>io.camunda</groupId>
+      <artifactId>camunda-spring-boot-starter</artifactId>
+    </dependency>
+
+    <!-- Configuration metadata processor — generates spring-configuration-metadata.json
+         so IDEs offer completion for framework.camunda.* properties. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-configuration-processor</artifactId>
+      <optional>true</optional>
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- framework-core: provides CamundaProcessService, BaseWorker, JdbcIdempotencyGuard,
+         JdbcOutboxRelay, VariableMapper, and all framework ports that this starter wires. -->
+    <dependency>
+      <groupId>com.aaseya.camunda</groupId>
+      <artifactId>framework-core</artifactId>
+      <version>0.1.0-SNAPSHOT</version>
+    </dependency>
+
+    <!-- spring-jdbc: optional so services that do not need JDBC-backed persistence are not
+         forced to pull in a DataSource.  The auto-configuration @Bean methods reference
+         JdbcTemplate in their signatures, so the artifact is required at compile time.
+         Services that want JdbcIdempotencyGuard or JdbcOutboxRelay must declare
+         spring-jdbc (or spring-boot-starter-data-jpa, which implies it) themselves. -->
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-jdbc</artifactId>
+      <optional>true</optional>
+    </dependency>
+
+    <!-- Test -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+  </dependencies>
+
+</project>

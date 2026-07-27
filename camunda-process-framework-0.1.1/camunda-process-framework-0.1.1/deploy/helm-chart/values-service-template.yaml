@@ -1,0 +1,21 @@
+image:
+  repository: registry.example.com/camunda-services/service-template
+  tag: 0.1.0-SNAPSHOT
+
+envFrom:
+  - secretRef:
+      name: service-template-camunda-secrets   # provides CAMUNDA_CLIENT_ID, CAMUNDA_CLIENT_SECRET, etc.
+  - secretRef:
+      name: service-template-db-secrets        # provides DB_URL, DB_USER, DB_PASSWORD
+
+autoscaling:
+  customMetrics:
+    - name: framework_job_active_backlog
+      target: 10
+
+networkPolicy:
+  egressPorts:
+    - port: 5432
+      protocol: TCP   # Postgres
+    - port: 443
+      protocol: TCP   # Camunda SaaS + IdP

@@ -1,0 +1,45 @@
+# Local development against a self-managed Camunda 8.9 running in Docker.
+#
+# Start the engine first:
+#   docker run -d --name camunda-local -p 26500:26500 -p 8080:8080 \
+#     -e SPRING_PROFILES_ACTIVE=broker,consolidated-auth,security \
+#     -e CAMUNDA_DATA_SECONDARYSTORAGE_TYPE=rdbms \
+#     -e CAMUNDA_DATABASE_TYPE=rdbms \
+#     -e 'CAMUNDA_DATABASE_URL=jdbc:h2:mem:camunda;DB_CLOSE_DELAY=-1;MODE=PostgreSQL' \
+#     -e CAMUNDA_DATABASE_USERNAME=sa -e CAMUNDA_DATABASE_PASSWORD= \
+#     -e ZEEBE_BROKER_EXPORTERS_RDBMS_CLASSNAME=io.camunda.exporter.rdbms.RdbmsExporter \
+#     -e CAMUNDA_SECURITY_AUTHENTICATION_UNPROTECTEDAPI=true \
+#     -e CAMUNDA_SECURITY_AUTHORIZATIONS_ENABLED=false \
+#     camunda/camunda:8.9.0
+#
+# Then run this service:
+#   mvn spring-boot:run -pl service-template -Dspring-boot.run.profiles=localdocker
+#
+# Camunda occupies port 8080, so this service listens on 8081.
+
+server:
+  port: 8081
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:service_template;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+
+camunda:
+  client:
+    # override the saas default set by CamundaSaasDefaultsEnvironmentPostProcessor
+    mode: self-managed
+    rest-address: http://localhost:8080
+    grpc-address: http://localhost:26500
+    auth:
+      # unprotected API on the local container - no OAuth round trip
+      method: none
+
+logging:
+  level:
+    com.aaseya: DEBUG
+    io.camunda: INFO

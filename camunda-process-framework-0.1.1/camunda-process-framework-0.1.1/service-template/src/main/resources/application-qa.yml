@@ -1,0 +1,15 @@
+# QA profile: informational logging, most actuator endpoints, no SQL echo.
+logging:
+  level:
+    root: INFO
+    com.aaseya: INFO
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics,env,configprops
+
+spring:
+  jpa:
+    show-sql: false

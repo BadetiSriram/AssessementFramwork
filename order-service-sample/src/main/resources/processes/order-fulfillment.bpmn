@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+                  id="Definitions_order_fulfillment"
+                  targetNamespace="http://bpmn.io/schema/bpmn"
+                  exporter="Camunda Modeler" exporterVersion="5.x">
+  <bpmn:process id="order-fulfillment" name="Order Fulfillment" isExecutable="true">
+    <bpmn:startEvent id="StartEvent_OrderCreated" name="Order created">
+      <bpmn:outgoing>Flow_start_to_reserve</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="Task_ReserveInventory" name="Reserve inventory">
+      <bpmn:extensionElements>
+        <!-- This type MUST equal @JobWorker(type = "reserve-inventory") on ReserveInventoryWorker. -->
+        <zeebe:taskDefinition type="reserve-inventory" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_start_to_reserve</bpmn:incoming>
+      <bpmn:outgoing>Flow_reserve_to_end</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="EndEvent_OrderReserved" name="Inventory reserved">
+      <bpmn:incoming>Flow_reserve_to_end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_start_to_reserve"
+                       sourceRef="StartEvent_OrderCreated" targetRef="Task_ReserveInventory" />
+    <bpmn:sequenceFlow id="Flow_reserve_to_end"
+                       sourceRef="Task_ReserveInventory" targetRef="EndEvent_OrderReserved" />
+    <!-- Business-error boundary: the worker throws BPMN error ORDER_NOT_FOUND on a domain failure. -->
+    <bpmn:boundaryEvent id="Boundary_OrderNotFound" name="Order not found" attachedToRef="Task_ReserveInventory">
+      <bpmn:outgoing>Flow_error_to_end</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="ErrorDef_OrderNotFound" errorRef="Error_OrderNotFound" />
+    </bpmn:boundaryEvent>
+    <bpmn:endEvent id="EndEvent_OrderRejected" name="Order rejected">
+      <bpmn:incoming>Flow_error_to_end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_error_to_end"
+                       sourceRef="Boundary_OrderNotFound" targetRef="EndEvent_OrderRejected" />
+  </bpmn:process>
+  <bpmn:error id="Error_OrderNotFound" name="Order not found" errorCode="ORDER_NOT_FOUND" />
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="order-fulfillment">
+      <bpmndi:BPMNShape id="StartEvent_OrderCreated_di" bpmnElement="StartEvent_OrderCreated">
+        <dc:Bounds x="172" y="102" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="158" y="145" width="66" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ReserveInventory_di" bpmnElement="Task_ReserveInventory">
+        <dc:Bounds x="260" y="80" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_OrderReserved_di" bpmnElement="EndEvent_OrderReserved">
+        <dc:Bounds x="412" y="102" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="392" y="145" width="78" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Boundary_OrderNotFound_di" bpmnElement="Boundary_OrderNotFound">
+        <dc:Bounds x="292" y="142" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="278" y="185" width="66" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_OrderRejected_di" bpmnElement="EndEvent_OrderRejected">
+        <dc:Bounds x="292" y="252" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="276" y="295" width="70" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_start_to_reserve_di" bpmnElement="Flow_start_to_reserve">
+        <di:waypoint x="208" y="120" />
+        <di:waypoint x="260" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_reserve_to_end_di" bpmnElement="Flow_reserve_to_end">
+        <di:waypoint x="360" y="120" />
+        <di:waypoint x="412" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_error_to_end_di" bpmnElement="Flow_error_to_end">
+        <di:waypoint x="310" y="178" />
+        <di:waypoint x="310" y="252" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

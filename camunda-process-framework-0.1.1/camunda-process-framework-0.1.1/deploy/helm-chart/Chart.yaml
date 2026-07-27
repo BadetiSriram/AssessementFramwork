@@ -1,0 +1,8 @@
+apiVersion: v2
+name: camunda-service
+description: Generic Helm chart for services built on camunda-process-framework
+type: application
+version: 0.1.0
+appVersion: "0.1.0-SNAPSHOT"
+maintainers:
+  - name: Framework Team

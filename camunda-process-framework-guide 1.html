@@ -1,0 +1,1586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Camunda Process Framework 0.1.1 — Full Architecture & Developer Guide</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2333;
+    --border: #30363d;
+    --accent: #FF6C37;
+    --accent2: #2da44e;
+    --accent3: #58a6ff;
+    --accent4: #f78166;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --code-bg: #0d1117;
+    --yellow: #e3b341;
+    --purple: #bc8cff;
+    --teal: #39d353;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+  }
+
+  /* NAV */
+  nav {
+    position: fixed; top: 0; left: 0; width: 260px; height: 100vh;
+    background: var(--surface); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 1.5rem 0; z-index: 100;
+  }
+  nav .logo {
+    padding: 0 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 1rem;
+  }
+  nav .logo h2 { font-size: 13px; color: var(--accent); font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+  nav .logo p { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  nav ul { list-style: none; padding: 0 .75rem; }
+  nav ul li { margin: 1px 0; }
+  nav ul li a {
+    display: block; padding: .35rem .75rem; border-radius: 6px;
+    color: var(--muted); text-decoration: none; font-size: 13px;
+    transition: all .15s;
+  }
+  nav ul li a:hover, nav ul li a.active { color: var(--text); background: var(--surface2); }
+  nav .section-label {
+    padding: .75rem 1.25rem .25rem;
+    font-size: 10px; font-weight: 700; color: var(--muted);
+    letter-spacing: .1em; text-transform: uppercase;
+  }
+
+  /* MAIN */
+  main { margin-left: 260px; padding: 2.5rem 3rem; max-width: 1100px; }
+
+  /* HEADINGS */
+  h1 { font-size: 2.2rem; font-weight: 800; color: var(--text); margin-bottom: .5rem; }
+  h1 span { color: var(--accent); }
+  h2 { font-size: 1.5rem; font-weight: 700; color: var(--text); margin: 3rem 0 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+  h3 { font-size: 1.1rem; font-weight: 700; color: var(--accent3); margin: 2rem 0 .75rem; }
+  h4 { font-size: .95rem; font-weight: 700; color: var(--yellow); margin: 1.5rem 0 .5rem; }
+  p { margin-bottom: 1rem; color: var(--text); }
+
+  /* HERO */
+  .hero { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 2rem; margin-bottom: 2rem; }
+  .hero-meta { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 1rem; }
+  .badge { display: inline-flex; align-items: center; gap: .4rem; background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: .2rem .75rem; font-size: 12px; color: var(--muted); }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; }
+  .badge .dot.orange { background: var(--accent); }
+  .badge .dot.green { background: var(--accent2); }
+  .badge .dot.blue { background: var(--accent3); }
+  .badge .dot.purple { background: var(--purple); }
+
+  /* CODE */
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 1.25rem 1.5rem; overflow-x: auto; margin: 1rem 0 1.5rem;
+    font-size: 13px; line-height: 1.6;
+  }
+  code { font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace; }
+  p code, li code, td code {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 4px; padding: .1em .4em; font-size: 12.5px; color: var(--accent3);
+  }
+  .kw { color: #ff7b72; }
+  .ty { color: #79c0ff; }
+  .st { color: #a5d6ff; }
+  .cm { color: var(--muted); font-style: italic; }
+  .an { color: var(--yellow); }
+  .fn { color: #d2a8ff; }
+  .nu { color: var(--teal); }
+  .ky { color: #ff7b72; }
+
+  /* TABLES */
+  .table-wrap { overflow-x: auto; margin: 1rem 0 1.5rem; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th { background: var(--surface2); color: var(--text); font-weight: 700; padding: .6rem 1rem; text-align: left; border-bottom: 2px solid var(--border); }
+  td { padding: .55rem 1rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:hover td { background: var(--surface); }
+  td:first-child { color: var(--accent3); font-family: monospace; font-size: 12.5px; white-space: nowrap; }
+
+  /* CARDS */
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; margin: 1rem 0 1.5rem; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; }
+  .card h4 { margin: 0 0 .5rem; font-size: 14px; color: var(--text); }
+  .card p { font-size: 13px; color: var(--muted); margin: 0; }
+  .card .tag { display: inline-block; margin-top: .75rem; font-size: 11px; font-weight: 700; padding: .15rem .6rem; border-radius: 12px; }
+  .tag.camunda { background: #FF6C3720; color: var(--accent); }
+  .tag.spring { background: #2da44e20; color: var(--accent2); }
+  .tag.pattern { background: #58a6ff20; color: var(--accent3); }
+  .tag.test { background: #f7816620; color: var(--accent4); }
+
+  /* CALLOUTS */
+  .callout { display: flex; gap: 1rem; padding: 1rem 1.25rem; border-radius: 8px; margin: 1rem 0 1.5rem; font-size: 13.5px; }
+  .callout.info { background: #58a6ff15; border-left: 3px solid var(--accent3); }
+  .callout.warn { background: #e3b34115; border-left: 3px solid var(--yellow); }
+  .callout.critical { background: #f7816615; border-left: 3px solid var(--accent4); }
+  .callout.success { background: #2da44e15; border-left: 3px solid var(--accent2); }
+  .callout-icon { font-size: 20px; flex-shrink: 0; line-height: 1.4; }
+
+  /* FLOW DIAGRAM */
+  .flow { display: flex; flex-direction: column; gap: 0; margin: 1rem 0 1.5rem; }
+  .flow-step { display: flex; align-items: flex-start; gap: 1rem; }
+  .flow-line { display: flex; flex-direction: column; align-items: center; }
+  .flow-circle {
+    width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center;
+    justify-content: center; font-size: 13px; font-weight: 800; flex-shrink: 0;
+    background: var(--accent); color: white;
+  }
+  .flow-connector { width: 2px; background: var(--border); flex: 1; min-height: 20px; }
+  .flow-content { flex: 1; padding-bottom: 1.25rem; }
+  .flow-content h4 { margin: .3rem 0 .3rem; font-size: 14px; }
+  .flow-content p { margin: 0; font-size: 13px; color: var(--muted); }
+
+  /* ARCH LAYERS */
+  .arch-layer {
+    border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.25rem;
+    margin: .5rem 0; display: flex; align-items: center; gap: 1rem;
+  }
+  .arch-layer .layer-label {
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+    writing-mode: vertical-rl; transform: rotate(180deg);
+    color: var(--muted); min-width: 60px;
+  }
+  .arch-layer .layer-items { display: flex; flex-wrap: wrap; gap: .5rem; flex: 1; }
+  .arch-item { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: .3rem .7rem; font-size: 12px; color: var(--text); }
+
+  /* EXCEPTION TABLE */
+  .exc-table { width: 100%; border-collapse: collapse; margin: 1rem 0 1.5rem; font-size: 13.5px; }
+  .exc-table th { background: var(--surface2); padding: .5rem 1rem; text-align: left; border-bottom: 2px solid var(--border); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  .exc-table td { padding: .55rem 1rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+
+  /* POSTMAN */
+  .pm-endpoint { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin: .75rem 0; overflow: hidden; }
+  .pm-header { display: flex; align-items: center; gap: .75rem; padding: .75rem 1rem; border-bottom: 1px solid var(--border); background: var(--surface2); }
+  .method { font-size: 11px; font-weight: 800; padding: .2rem .5rem; border-radius: 4px; min-width: 44px; text-align: center; }
+  .method.GET { background: #2da44e25; color: var(--accent2); }
+  .method.POST { background: #58a6ff25; color: var(--accent3); }
+  .method.PUT { background: #e3b34125; color: var(--yellow); }
+  .method.DEL { background: #f7816625; color: var(--accent4); }
+  .pm-path { font-family: monospace; font-size: 13px; color: var(--text); }
+  .pm-desc { font-size: 12px; color: var(--muted); margin-left: auto; }
+  .pm-body { padding: .75rem 1rem; }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+  ul, ol { padding-left: 1.5rem; margin-bottom: 1rem; }
+  li { margin-bottom: .35rem; font-size: 14px; }
+  section { margin-bottom: 3rem; }
+
+  @media (max-width: 900px) {
+    nav { display: none; }
+    main { margin-left: 0; padding: 1.5rem; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">
+    <h2>CPF Guide</h2>
+    <p>v0.1.1 · Aaseya / YASH</p>
+  </div>
+  <div class="section-label">Overview</div>
+  <ul>
+    <li><a href="#overview">What Is This Framework?</a></li>
+    <li><a href="#modules">Module Map</a></li>
+    <li><a href="#arch">Full Architecture</a></li>
+    <li><a href="#layers">Layer Rules</a></li>
+  </ul>
+  <div class="section-label">Core Patterns</div>
+  <ul>
+    <li><a href="#baseworker">BaseWorker&lt;V&gt;</a></li>
+    <li><a href="#processservice">ProcessService</a></li>
+    <li><a href="#workresult">WorkResult</a></li>
+    <li><a href="#exceptions">Exception Hierarchy</a></li>
+    <li><a href="#idempotency">IdempotencyGuard</a></li>
+    <li><a href="#outbox">OutboxRelay</a></li>
+    <li><a href="#auditable">AuditableEntity</a></li>
+    <li><a href="#variablemapper">VariableMapper</a></li>
+  </ul>
+  <div class="section-label">Starters</div>
+  <ul>
+    <li><a href="#camunda-starter">framework-camunda-starter</a></li>
+    <li><a href="#security-starter">framework-security-starter</a></li>
+    <li><a href="#obs-starter">framework-observability-starter</a></li>
+    <li><a href="#data-starter">framework-data-starter</a></li>
+    <li><a href="#web-starter">framework-web-starter</a></li>
+    <li><a href="#test-module">framework-test</a></li>
+  </ul>
+  <div class="section-label">How To</div>
+  <ul>
+    <li><a href="#howstart">How To Start</a></li>
+    <li><a href="#scaffold">Scaffold a Service</a></li>
+    <li><a href="#writeworker">Write a Worker</a></li>
+    <li><a href="#saga">Saga Pattern</a></li>
+    <li><a href="#testing">Testing Guide</a></li>
+    <li><a href="#postman">Postman Guide</a></li>
+    <li><a href="#ui-testing">UI / Operate Testing</a></li>
+    <li><a href="#config-ref">Config Reference</a></li>
+    <li><a href="#deploy">Deploy</a></li>
+    <li><a href="#troubleshoot">Troubleshooting</a></li>
+  </ul>
+</nav>
+
+<main>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="overview">
+  <div class="hero">
+    <h1>Camunda Process <span>Framework 0.1.1</span></h1>
+    <p style="color:var(--muted);margin-top:.5rem;">Multi-module Spring Boot 4 / Java 21 base framework for Camunda 8.9 SaaS — complete architecture, patterns, and developer walkthrough.</p>
+    <div class="hero-meta">
+      <span class="badge"><span class="dot orange"></span>Camunda 8.9 SaaS</span>
+      <span class="badge"><span class="dot green"></span>Spring Boot 4.0.5</span>
+      <span class="badge"><span class="dot blue"></span>Java 21</span>
+      <span class="badge"><span class="dot purple"></span>8 Modules · 183 Tests</span>
+    </div>
+  </div>
+
+  <p>This framework is a <strong>production-grade, opinionated scaffold</strong> built by Aaseya for every team building process-orchestrated microservices on Camunda 8.9. It ships pre-wired patterns for job workers, saga orchestration, idempotency, outbox messaging, JWT security, observability, and more — so teams write business code, not infrastructure plumbing.</p>
+
+  <h3>Design Philosophy — 5 Cardinal Invariants</h3>
+  <div class="card-grid">
+    <div class="card">
+      <h4>① BPMN is the source of truth</h4>
+      <p>Every lifecycle lives in a BPMN diagram. Each automated step maps 1:1 to a <code>@JobWorker</code>. Each human step is a Camunda User Task assigned to a Keycloak group.</p>
+      <span class="tag camunda">Camunda</span>
+    </div>
+    <div class="card">
+      <h4>② Workers &amp; Controllers = Adapters only</h4>
+      <p>No business rules in workers or controllers. Business logic lives exclusively in the <code>domain/</code> layer.</p>
+      <span class="tag pattern">Architecture</span>
+    </div>
+    <div class="card">
+      <h4>③ Orchestration-based Saga</h4>
+      <p>Services never call each other directly for saga steps. Camunda mediates every hop. Rollback = BPMN compensation boundary events.</p>
+      <span class="tag camunda">Saga</span>
+    </div>
+    <div class="card">
+      <h4>④ Domain never imports Camunda</h4>
+      <p>All engine access goes through <code>ProcessService</code> facade. Enforced by ArchUnit at build time. Domain stays pure Java.</p>
+      <span class="tag pattern">Port &amp; Adapter</span>
+    </div>
+    <div class="card">
+      <h4>⑤ Business failure ≠ Technical failure</h4>
+      <p>Business failures throw <code>newThrowErrorCommand</code> → BPMN boundary event. Technical failures rethrow → Camunda decrements retries → incident.</p>
+      <span class="tag pattern">Error Handling</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="modules">
+  <h2>Module Map</h2>
+  <p>The repo is a Maven multi-module project. Eight modules are published; one is the runnable scaffold.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Module</th><th>Type</th><th>What it provides</th></tr></thead>
+      <tbody>
+        <tr><td>framework-core</td><td>Library (no Spring)</td><td>All patterns: <code>BaseWorker</code>, <code>ProcessService</code>, <code>VariableMapper</code>, <code>IdempotencyGuard</code>, <code>OutboxRelay</code>, <code>AuditableEntity</code>, exceptions, MDC keys. Zero Spring annotations inside.</td></tr>
+        <tr><td>framework-camunda-starter</td><td>Spring Boot Auto-configuration</td><td>Wires <code>ProcessService</code>, <code>VariableMapper</code>, <code>IdempotencyGuard</code>, <code>OutboxRelay</code>, <code>ObjectMapper</code> as Spring beans. Sets <code>camunda.client.mode=saas</code> default.</td></tr>
+        <tr><td>framework-security-starter</td><td>Spring Boot Auto-configuration</td><td>OAuth2 resource server. <code>JwtRealmRolesAuthenticationConverter</code> extracts Keycloak roles. Optional CORS bean.</td></tr>
+        <tr><td>framework-observability-starter</td><td>Spring Boot Auto-configuration</td><td>Micrometer + Prometheus + OTel. <code>MdcCorrelationFilter</code> for X-Correlation-Id. <code>FrameworkCounters</code> for business metrics.</td></tr>
+        <tr><td>framework-data-starter</td><td>Spring Boot Auto-configuration</td><td>JPA + Flyway opinionated defaults. <code>AuditColumnListener</code> stamps createdAt/updatedAt/createdBy/updatedBy. <code>FlywayNamingConventionValidator</code>.</td></tr>
+        <tr><td>framework-web-starter</td><td>Spring Boot Auto-configuration</td><td><code>Response&lt;T&gt;</code> envelope. <code>GlobalExceptionHandler</code> → RFC 7807 ProblemDetail mapping for all exception types.</td></tr>
+        <tr><td>framework-test</td><td>Test support library</td><td>6 ArchUnit rules, <code>CamundaScenarioTestBase</code>, <code>JdbcTemplateTestFactory</code>, <code>MdcAssertions</code>.</td></tr>
+        <tr><td>service-template</td><td>Runnable scaffold</td><td>Copy-me starting point. Bare <code>@SpringBootApplication</code> + <code>@EnableScheduling</code>, 5 profiles, Flyway V1 migration creating the 2 framework tables.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="arch">
+  <h2>Full Architecture &amp; Request Flow</h2>
+
+  <h3>Layered Architecture</h3>
+  <div class="arch-layer" style="background:linear-gradient(90deg,#FF6C3710,var(--surface))">
+    <div class="layer-label" style="color:var(--accent)">HTTP Layer</div>
+    <div class="layer-items">
+      <span class="arch-item">REST Controllers (<code>web/</code>)</span>
+      <span class="arch-item">Response&lt;T&gt; envelope</span>
+      <span class="arch-item">GlobalExceptionHandler (RFC 7807)</span>
+      <span class="arch-item">MdcCorrelationFilter</span>
+      <span class="arch-item">JwtRealmRolesAuthenticationConverter</span>
+    </div>
+  </div>
+  <div style="width:2px;height:20px;background:var(--border);margin-left:90px;"></div>
+  <div class="arch-layer" style="background:linear-gradient(90deg,#58a6ff10,var(--surface))">
+    <div class="layer-label" style="color:var(--accent3)">Worker Layer</div>
+    <div class="layer-items">
+      <span class="arch-item">@JobWorker classes (<code>workers/</code>)</span>
+      <span class="arch-item">BaseWorker&lt;V&gt; (template method)</span>
+      <span class="arch-item">VariableMapper (JSON → record)</span>
+      <span class="arch-item">WorkResult (sealed interface)</span>
+      <span class="arch-item">IdempotencyGuard</span>
+    </div>
+  </div>
+  <div style="width:2px;height:20px;background:var(--border);margin-left:90px;"></div>
+  <div class="arch-layer" style="background:linear-gradient(90deg,#2da44e10,var(--surface))">
+    <div class="layer-label" style="color:var(--accent2)">Domain Layer</div>
+    <div class="layer-items">
+      <span class="arch-item">Domain Services (<code>domain/</code>)</span>
+      <span class="arch-item">AuditableEntity&lt;S&gt; state machines</span>
+      <span class="arch-item">Domain Events</span>
+      <span class="arch-item" style="color:var(--accent4)">⛔ No Camunda imports</span>
+      <span class="arch-item" style="color:var(--accent4)">⛔ No Spring Web imports</span>
+    </div>
+  </div>
+  <div style="width:2px;height:20px;background:var(--border);margin-left:90px;"></div>
+  <div class="arch-layer" style="background:linear-gradient(90deg,#f7816610,var(--surface))">
+    <div class="layer-label" style="color:var(--accent4)">Infrastructure</div>
+    <div class="layer-items">
+      <span class="arch-item">ProcessService (CamundaProcessService)</span>
+      <span class="arch-item">JdbcIdempotencyGuard</span>
+      <span class="arch-item">JdbcOutboxRelay</span>
+      <span class="arch-item">JPA Repositories (<code>infrastructure/</code>)</span>
+      <span class="arch-item">AuditColumnListener</span>
+    </div>
+  </div>
+  <div style="width:2px;height:20px;background:var(--border);margin-left:90px;"></div>
+  <div class="arch-layer" style="background:linear-gradient(90deg,#bc8cff10,var(--surface))">
+    <div class="layer-label" style="color:var(--purple)">External</div>
+    <div class="layer-items">
+      <span class="arch-item">Camunda 8.9 SaaS Cluster</span>
+      <span class="arch-item">PostgreSQL 16</span>
+      <span class="arch-item">Keycloak / IdP</span>
+      <span class="arch-item">Prometheus / Grafana</span>
+      <span class="arch-item">OpenTelemetry Collector</span>
+    </div>
+  </div>
+
+  <h3>Complete Request &amp; Job Execution Flow</h3>
+
+  <h4>Flow A — Starting a Process via REST</h4>
+  <div class="flow">
+    <div class="flow-step">
+      <div class="flow-line"><div class="flow-circle">1</div><div class="flow-connector"></div></div>
+      <div class="flow-content">
+        <h4>HTTP Request arrives</h4>
+        <p><code>MdcCorrelationFilter</code> reads <code>X-Correlation-Id</code> header (or generates UUID). Puts it in SLF4J MDC. Echoes it back in response header. <code>X-Tenant-Id</code> also pushed to MDC.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-line"><div class="flow-circle">2</div><div class="flow-connector"></div></div>
+      <div class="flow-content">
+        <h4>JWT Authentication</h4>
+        <p>Spring Security validates Bearer token. <code>JwtRealmRolesAuthenticationConverter</code> extracts <code>realm_access.roles</code> from JWT and maps to <code>ROLE_*</code> Spring authorities.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-line"><div class="flow-circle">3</div><div class="flow-connector"></div></div>
+      <div class="flow-content">
+        <h4>Controller receives request</h4>
+        <p>Returns DTO only — never entity. Returns <code>Response.ok(dto)</code> which auto-captures correlationId from MDC + timestamp into the <code>Meta</code> envelope.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-line"><div class="flow-circle">4</div><div class="flow-connector"></div></div>
+      <div class="flow-content">
+        <h4>Domain Service or OutboxRelay</h4>
+        <p>Either calls <code>processService.start(StartProcessCommand)</code> directly, or writes to <code>process_outbox</code> table within the same DB transaction as the domain change (transactional outbox pattern).</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-line"><div class="flow-circle">5</div><div class="flow-connector"></div></div>
+      <div class="flow-content">
+        <h4>Camunda cluster starts instance</h4>
+        <p><code>CamundaProcessService.start()</code> calls <code>camundaClient.newCreateInstanceCommand()</code>. Returns the <code>processInstanceKey</code>. Multi-tenant mode conditionally forwards <code>tenantId</code>.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-line"><div class="flow-circle">6</div><div class="flow-connector"></div></div>
+      <div class="flow-content">
+        <h4>BPMN executes — workers are activated</h4>
+        <p>Camunda activates jobs for service task nodes. The appropriate <code>@JobWorker</code> bean picks up the job.</p>
+      </div>
+    </div>
+  </div>
+
+  <h4>Flow B — Job Worker Execution (inside BaseWorker.execute())</h4>
+  <div class="flow">
+    <div class="flow-step">
+      <div class="flow-line"><div class="flow-circle">1</div><div class="flow-connector"></div></div>
+      <div class="flow-content">
+        <h4>Deserialize variables</h4>
+        <p>Primary: <code>job.getVariablesAsType(V.class)</code>. Fallback: <code>VariableMapper.map(job.getVariables(), V.class)</code>. On failure → runtime exception (Camunda decrements retries).</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-line"><div class="flow-circle">2</div><div class="flow-connector"></div></div>
+      <div class="flow-content">
+        <h4>MDC push</h4>
+        <p>Pushes <code>processInstanceKey</code>, <code>elementId</code>, <code>jobType</code>, <code>jobKey</code>, <code>workerName</code>, <code>tenantId</code>, <code>businessKey</code> into SLF4J MDC for structured log correlation.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-line"><div class="flow-circle">3</div><div class="flow-connector"></div></div>
+      <div class="flow-content">
+        <h4>Idempotency check</h4>
+        <p><code>IdempotencyGuard.check(businessKey, elementId)</code> queries <code>worker_execution(business_key, element_id)</code> composite PK. If already recorded → complete silently + increment <code>framework_job_replayed_total</code> counter. Return early.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-line"><div class="flow-circle">4</div><div class="flow-connector"></div></div>
+      <div class="flow-content">
+        <h4>validate() hook</h4>
+        <p>Subclass overrides <code>validate(V vars)</code>. Throws <code>BusinessException</code> if validation fails → framework converts to BPMN error event. Default is no-op.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-line"><div class="flow-circle">5</div><div class="flow-connector"></div></div>
+      <div class="flow-content">
+        <h4>doWork(vars, job)</h4>
+        <p>Your business logic runs. Returns a <code>WorkResult</code>: <code>Completed</code>, <code>BusinessError</code>, or <code>Compensated</code>.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-line"><div class="flow-circle">6</div><div class="flow-connector"></div></div>
+      <div class="flow-content">
+        <h4>mapResponse() + dispatch to Camunda</h4>
+        <p>Completed → <code>newCompleteCommand().variables(outVars)</code>. BusinessError → <code>newThrowErrorCommand(code, msg)</code>. Compensated → <code>newCompleteCommand()</code> no vars. Idempotency recorded on success.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-line"><div class="flow-circle">7</div><div class="flow-connector"></div></div>
+      <div class="flow-content">
+        <h4>Exception routing</h4>
+        <p><code>BusinessException</code> → throwError. <code>RetryableException</code> → rethrow (Camunda decrements retries). <code>NonRetryableException</code> → throwError(TECHNICAL_FAILURE). Unhandled <code>RuntimeException</code> → <code>handleException()</code> hook or rethrow.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-line"><div class="flow-circle">8</div><div class="flow-connector"></div></div>
+      <div class="flow-content">
+        <h4>MDC cleanup (finally block)</h4>
+        <p>All 7 MDC keys pushed in step 2 are removed in reverse order in the <code>finally</code> block — guaranteed even on exception. Prevents MDC leaking across thread-pool reuse.</p>
+      </div>
+    </div>
+  </div>
+
+  <h4>Flow C — Transactional Outbox (Reliable Process Start)</h4>
+  <pre><code><span class="cm">// In a @Transactional service method:</span>
+<span class="cm">// 1. Domain change and outbox write in SAME transaction</span>
+myEntityRepo.save(entity);
+outboxRelay.publishStart(
+  StartProcessCommand.withVariables(<span class="st">"MyProcess"</span>, entity.getId(), vars)
+);
+<span class="cm">// TX commits — both rows in one atomic write</span>
+
+<span class="cm">// 2. JdbcOutboxRelay.poll() fires every 2s (scheduled)</span>
+<span class="cm">//    SELECT ... FROM process_outbox WHERE dispatched_at IS NULL</span>
+<span class="cm">//    FOR UPDATE SKIP LOCKED  ← safe for parallel pods</span>
+<span class="cm">//    → processService.start(cmd)</span>
+<span class="cm">//    → UPDATE process_outbox SET dispatched_at = now() WHERE id = ?</span></code></pre>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="layers">
+  <h2>Layer Rules (ArchUnit)</h2>
+  <p>Six <code>ArchRule</code> constants in <code>ArchitectureRules</code> are enforced at build time via JUnit 5 + ArchUnit in any consuming service that adds <code>framework-test</code>.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Rule Constant</th><th>What it enforces</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>WEB_AND_WORKERS_MUST_NOT_ACCESS_INFRASTRUCTURE</td><td><code>web..</code> and <code>workers..</code> must not access <code>infrastructure..</code> or <code>repository..</code></td><td>Keeps adapters decoupled from persistence; enables swap of DB/engine without touching HTTP or worker code.</td></tr>
+        <tr><td>ONLY_INFRASTRUCTURE_CAMUNDA_MAY_IMPORT_CAMUNDA_CLIENT</td><td>Only <code>infrastructure.camunda..</code> (+ framework itself) may import <code>io.camunda.client.*</code></td><td>Prevents accidental engine coupling in domain or workers; enables protocol swap (REST↔gRPC) transparently.</td></tr>
+        <tr><td>DOMAIN_MUST_NOT_IMPORT_SPRING_WEB_OR_CAMUNDA</td><td><code>domain..</code> must not import <code>org.springframework.web</code>, <code>jakarta.servlet</code>, <code>io.camunda</code></td><td>Pure domain = testable without any framework context.</td></tr>
+        <tr><td>REST_CONTROLLERS_MUST_NOT_BE_TRANSACTIONAL</td><td><code>@RestController</code> classes must not be <code>@Transactional</code></td><td>Transactions held open during HTTP serialisation waste connections; rollback semantics break under MVC exception handler.</td></tr>
+        <tr><td>CONTROLLER_METHODS_MUST_NOT_EXPOSE_ENTITIES</td><td>Controller method params/return types must not be <code>@Entity</code> types</td><td>Leaks schema to API; triggers lazy-load NPEs; breaks API versioning.</td></tr>
+        <tr><td>USE_CONSTRUCTOR_INJECTION</td><td>No field annotated with <code>@Autowired</code></td><td>Constructor injection = testable without Spring context, final fields, explicit dependency contract.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="baseworker">
+  <h2>BaseWorker&lt;V&gt; — Deep Dive</h2>
+  <p><code>BaseWorker&lt;V&gt;</code> is the template-method base class. Every job worker extends it and implements exactly two abstract methods. The framework owns the full execution skeleton via <code>execute()</code> which is declared <code>final</code>.</p>
+
+  <h3>Methods to Implement</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Method</th><th>Required?</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td>varsType()</td><td>✅ Abstract</td><td>Returns <code>Class&lt;V&gt;</code> token. The framework uses it to deserialize the job's JSON variables into your typed record.</td></tr>
+        <tr><td>doWork(V vars, ActivatedJob job)</td><td>✅ Abstract</td><td>Your business logic. Return a <code>WorkResult</code>. Throw only for transient technical failures.</td></tr>
+        <tr><td>validate(V vars)</td><td>Override optional</td><td>Validate input variables before doWork. Throw <code>BusinessException</code> to route to BPMN error boundary.</td></tr>
+        <tr><td>mapResponse(WorkResult.Completed)</td><td>Override optional</td><td>Transform output vars before they are sent to Camunda. Filter secrets, add computed fields.</td></tr>
+        <tr><td>handleException(Exception, ActivatedJob)</td><td>Override optional</td><td>Intercept unhandled RuntimeExceptions. Return a WorkResult to replace the throw, or return null to rethrow.</td></tr>
+        <tr><td>workerType(ActivatedJob)</td><td>Override optional</td><td>Label used on metrics. Default returns job.getType().</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Metrics Emitted by BaseWorker</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Counter Name</th><th>Tags</th><th>When incremented</th></tr></thead>
+      <tbody>
+        <tr><td>framework_job_completed_total</td><td>type=&lt;jobType&gt;</td><td>Completed or Compensated WorkResult dispatched</td></tr>
+        <tr><td>framework_job_business_error_total</td><td>type=&lt;jobType&gt;, code=&lt;errorCode&gt;</td><td>BusinessError or BusinessException thrown</td></tr>
+        <tr><td>framework_job_failed_total</td><td>type=&lt;jobType&gt;</td><td>RetryableException or unhandled RuntimeException</td></tr>
+        <tr><td>framework_job_replayed_total</td><td>type=&lt;jobType&gt;</td><td>Idempotency guard detected already-processed job</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Example Worker</h3>
+  <pre><code><span class="an">@Component</span>
+<span class="kw">public class</span> <span class="ty">ValidateApplicationWorker</span> <span class="kw">extends</span> <span class="ty">BaseWorker</span>&lt;<span class="ty">ValidateApplicationVars</span>&gt; {
+
+    <span class="kw">private final</span> <span class="ty">ApplicationDomainService</span> domainService;
+
+    <span class="kw">public</span> <span class="fn">ValidateApplicationWorker</span>(<span class="ty">ApplicationDomainService</span> domainService,
+                                         <span class="ty">VariableMapper</span> mapper,
+                                         <span class="ty">IdempotencyGuard</span> guard,
+                                         <span class="ty">MeterRegistry</span> registry) {
+        <span class="kw">super</span>(mapper, guard, registry);
+        <span class="kw">this</span>.domainService = domainService;
+    }
+
+    <span class="an">@Override</span>
+    <span class="kw">protected</span> <span class="ty">Class</span>&lt;<span class="ty">ValidateApplicationVars</span>&gt; <span class="fn">varsType</span>() {
+        <span class="kw">return</span> <span class="ty">ValidateApplicationVars</span>.<span class="kw">class</span>;
+    }
+
+    <span class="an">@Override</span>
+    <span class="kw">protected</span> <span class="ty">WorkResult</span> <span class="fn">doWork</span>(<span class="ty">ValidateApplicationVars</span> vars, <span class="ty">ActivatedJob</span> job) {
+        <span class="ty">ValidationResult</span> result = domainService.validate(vars.applicationId());
+        <span class="kw">if</span> (!result.isValid()) {
+            <span class="kw">return</span> <span class="ty">WorkResult</span>.businessError(<span class="st">"VALIDATION_FAILED"</span>, result.message());
+        }
+        <span class="kw">return</span> <span class="ty">WorkResult</span>.completed(<span class="ty">Map</span>.of(<span class="st">"validationStatus"</span>, <span class="st">"PASSED"</span>));
+    }
+
+    <span class="an">@JobWorker</span>(type = <span class="st">"validate-application"</span>, autoComplete = <span class="kw">false</span>)
+    <span class="kw">public void</span> <span class="fn">handle</span>(<span class="ty">JobClient</span> client, <span class="ty">ActivatedJob</span> job) {
+        execute(client, job); <span class="cm">// delegate to framework skeleton</span>
+    }
+}
+
+<span class="cm">// Typed variable record (Java 21 record)</span>
+<span class="kw">public record</span> <span class="ty">ValidateApplicationVars</span>(
+    <span class="ty">String</span> applicationId,   <span class="cm">// required — VariableMapper throws if null</span>
+    <span class="ty">String</span> businessKey,     <span class="cm">// required — used for idempotency</span>
+    <span class="an">@Nullable</span> <span class="ty">String</span> notes  <span class="cm">// optional field</span>
+) {}</code></pre>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="processservice">
+  <h2>ProcessService — API Reference</h2>
+  <p><code>ProcessService</code> is the port (outbound interface) that all application-layer code uses to talk to Camunda. <code>CamundaProcessService</code> is the adapter implementation. Domain code never imports <code>io.camunda.client.*</code>.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Method</th><th>Command Record</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td>start(StartProcessCommand)</td><td>bpmnProcessId, businessKey, variables, tenantId</td><td>Creates a new process instance. Returns <code>processInstanceKey</code>. Forwards tenantId only if multi-tenant=true.</td></tr>
+        <tr><td>correlate(CorrelateMessageCommand)</td><td>messageName, correlationKey, variables, tenantId</td><td>Correlates a message to a waiting process instance. Fails if no instance is waiting.</td></tr>
+        <tr><td>publish(PublishMessageCommand)</td><td>messageName, correlationKey, variables, timeToLive, messageId</td><td>Publishes a message to the broker (fire-and-forget). Works for message-start events too. messageId enables deduplication.</td></tr>
+        <tr><td>completeActiveUserTask(processInstanceKey, vars)</td><td>—</td><td>Finds active CREATED user task for the instance (exponential retry, 5 attempts, 200ms base) and completes it with vars.</td></tr>
+        <tr><td>findActiveUserTaskKey(processInstanceKey)</td><td>—</td><td>Returns Optional&lt;Long&gt; — the user task key. Retries 5× because the Camunda search index is eventually consistent.</td></tr>
+        <tr><td>cancel(processInstanceKey, reason)</td><td>—</td><td>Cancels a running process instance. Reason shows in Operate audit trail.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>StartProcessCommand — Factory Methods</h3>
+  <pre><code><span class="cm">// Minimal — no variables, no tenant</span>
+<span class="ty">StartProcessCommand</span>.of(<span class="st">"Process_Booking"</span>, <span class="st">"BOOKING-2025-001"</span>);
+
+<span class="cm">// With variables</span>
+<span class="ty">StartProcessCommand</span>.withVariables(
+    <span class="st">"Process_Booking"</span>,
+    <span class="st">"BOOKING-2025-001"</span>,
+    <span class="ty">Map</span>.of(<span class="st">"applicantId"</span>, <span class="nu">123</span>, <span class="st">"amount"</span>, <span class="nu">5000.0</span>)
+);
+
+<span class="cm">// Multi-tenant (full constructor)</span>
+<span class="kw">new</span> <span class="ty">StartProcessCommand</span>(<span class="st">"Process_Booking"</span>, vars, <span class="st">"BK-001"</span>, <span class="st">"tenant-a"</span>);</code></pre>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="workresult">
+  <h2>WorkResult — Sealed Interface</h2>
+  <p>A <code>WorkResult</code> is the only return type from <code>doWork()</code>. It's a <strong>sealed interface</strong> with three permits — the framework pattern-matches on them to dispatch the correct Camunda command.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Variant</th><th>Camunda Command</th><th>Use when</th></tr></thead>
+      <tbody>
+        <tr><td>WorkResult.Completed(Map variables)</td><td>newCompleteCommand().variables(outVars)</td><td>Job succeeded. Output variables are written to process scope.</td></tr>
+        <tr><td>WorkResult.BusinessError(errorCode, errorMessage)</td><td>newThrowErrorCommand(code, msg)</td><td>Domain validation failed. BPMN boundary event catches by errorCode. Does NOT burn retry budget.</td></tr>
+        <tr><td>WorkResult.Compensated()</td><td>newCompleteCommand() (no vars)</td><td>Compensation job completed. Part of saga rollback. No output variables needed.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <pre><code><span class="cm">// Static factory methods — prefer these</span>
+<span class="ty">WorkResult</span>.completed(<span class="ty">Map</span>.of(<span class="st">"orderId"</span>, id));   <span class="cm">// with variables</span>
+<span class="ty">WorkResult</span>.completed();                          <span class="cm">// no output needed</span>
+<span class="ty">WorkResult</span>.businessError(<span class="st">"DOC_MISSING"</span>, <span class="st">"Required document not uploaded"</span>);
+<span class="ty">WorkResult</span>.compensated();                        <span class="cm">// saga rollback step</span></code></pre>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="exceptions">
+  <h2>Exception Hierarchy</h2>
+  <p>All exceptions extend <code>FrameworkException</code> which carries an <code>errorCode</code> (stable BPMN-safe string) and an <code>errorMessage</code> (human readable). The hierarchy drives both Camunda routing and HTTP response codes.</p>
+  <pre><code>FrameworkException (abstract)
+├── BusinessException          → Worker: throwError | REST: 422
+└── TechnicalException (abstract)
+    ├── RetryableException     → Worker: rethrow (retry) | REST: 503 + Retry-After: 5
+    └── NonRetryableException  → Worker: throwError(TECHNICAL_FAILURE) | REST: 500
+</code></pre>
+  <div class="table-wrap">
+    <table class="exc-table">
+      <thead><tr><th>Exception</th><th>Worker Behavior</th><th>REST Behavior</th><th>Example Use Case</th></tr></thead>
+      <tbody>
+        <tr><td>BusinessException</td><td>newThrowErrorCommand(code, msg) → BPMN boundary event catches it</td><td>HTTP 422 Unprocessable Entity + errorCode</td><td>Invalid state transition, document missing, rule violation</td></tr>
+        <tr><td>RetryableException</td><td>Rethrows — Camunda decrements job retry counter. Eventually → incident</td><td>HTTP 503 + Retry-After: 5 header</td><td>DB connection timeout, downstream service unavailable</td></tr>
+        <tr><td>NonRetryableException</td><td>throwError(TECHNICAL_FAILURE) — routes to BPMN boundary for permanent failure handling</td><td>HTTP 500 Internal Server Error</td><td>Schema mismatch, config error, corrupt data</td></tr>
+        <tr><td>IllegalStateTransitionException</td><td>Subtype of BusinessException. Thrown by AuditableEntity.transition()</td><td>HTTP 422</td><td>Trying to approve an already-rejected application</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <pre><code><span class="cm">// Usage examples:</span>
+<span class="kw">throw new</span> <span class="ty">BusinessException</span>(<span class="st">"VALIDATION_FAILED"</span>, <span class="st">"Mandatory field missing: email"</span>);
+<span class="kw">throw new</span> <span class="ty">RetryableException</span>(<span class="st">"DB_TIMEOUT"</span>, <span class="st">"Database query exceeded 30s"</span>);
+<span class="kw">throw new</span> <span class="ty">NonRetryableException</span>(<span class="st">"CONFIG_ERROR"</span>, <span class="st">"Missing SMTP host configuration"</span>);</code></pre>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="idempotency">
+  <h2>IdempotencyGuard</h2>
+  <p>Prevents double-processing of replayed Camunda jobs. Uses a <code>worker_execution</code> table with a composite primary key <code>(business_key, element_id)</code>. <code>ON CONFLICT DO NOTHING</code> makes concurrent inserts safe without locks.</p>
+  <pre><code><span class="cm">-- DDL (already in V1__framework_tables.sql)</span>
+CREATE TABLE worker_execution (
+    business_key   VARCHAR(200) NOT NULL,
+    element_id     VARCHAR(200) NOT NULL,
+    completed_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    result_hash    VARCHAR(200),            <span class="cm">-- optional hash of output, for diagnostics</span>
+    PRIMARY KEY (business_key, element_id)
+);</code></pre>
+  <div class="callout info">
+    <span class="callout-icon">ℹ️</span>
+    <span><code>BaseWorker</code> calls <code>guard.check()</code> and <code>guard.record()</code> automatically. You never call it manually in your worker. The guard is triggered whenever a <code>businessKey</code> variable is present in the job's variables JSON — extracted by convention.</span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="outbox">
+  <h2>OutboxRelay — Transactional Outbox Pattern</h2>
+  <p>Solves the dual-write problem: you need to save a domain entity AND start/correlate a Camunda process, but the two are on different systems. Write both in one DB transaction; the outbox poller dispatches async.</p>
+
+  <h3>Two Methods to Write</h3>
+  <pre><code><span class="cm">// In a @Transactional service method:</span>
+outboxRelay.publishStart(<span class="ty">StartProcessCommand</span>.withVariables(...));    <span class="cm">// kind=START</span>
+outboxRelay.publishCorrelate(<span class="kw">new</span> <span class="ty">CorrelateMessageCommand</span>(...));     <span class="cm">// kind=MESSAGE</span></code></pre>
+
+  <h3>Outbox Table</h3>
+  <pre><code><span class="cm">-- Also in V1__framework_tables.sql</span>
+CREATE TABLE process_outbox (
+    id             UUID         PRIMARY KEY,
+    aggregate_type VARCHAR(100) NOT NULL,
+    aggregate_id   VARCHAR(200) NOT NULL,
+    kind           VARCHAR(20)  NOT NULL,   <span class="cm">-- 'START' | 'MESSAGE'</span>
+    payload        TEXT         NOT NULL,   <span class="cm">-- JSON-serialized command</span>
+    created_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    dispatched_at  TIMESTAMP               <span class="cm">-- NULL = pending, NOT NULL = done</span>
+);
+CREATE INDEX idx_process_outbox_undispatched
+    ON process_outbox (created_at) WHERE dispatched_at IS NULL;</code></pre>
+
+  <h3>Poll Mechanism</h3>
+  <p>The <code>@Scheduled(fixedDelayString = "${framework.outbox.poll-interval:PT2S}")</code> poll runs every 2 seconds by default. Uses <code>SELECT ... FOR UPDATE SKIP LOCKED</code> so multiple pods don't steal each other's rows. Requires <code>@EnableScheduling</code> on your <code>@SpringBootApplication</code> class.</p>
+  <div class="callout warn">
+    <span class="callout-icon">⚠️</span>
+    <span><code>FOR UPDATE SKIP LOCKED</code> is Postgres-specific. In tests using H2 in <code>MODE=PostgreSQL</code>, this usually works, but if it fails, run outbox tests against a real Postgres (Testcontainers).</span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="auditable">
+  <h2>AuditableEntity&lt;S&gt;</h2>
+  <p>Abstract base for domain aggregates that need a typed state machine + audit trail. Extend this on your JPA entity.</p>
+  <pre><code><span class="an">@Entity</span>
+<span class="an">@EntityListeners</span>(<span class="ty">AuditColumnListener</span>.<span class="kw">class</span>)
+<span class="kw">public class</span> <span class="ty">Application</span> <span class="kw">extends</span> <span class="ty">AuditableEntity</span>&lt;<span class="ty">ApplicationStatus</span>&gt; {
+
+    <span class="an">@Enumerated</span>(<span class="ty">EnumType</span>.STRING)
+    <span class="kw">private</span> <span class="ty">ApplicationStatus</span> status;
+
+    <span class="kw">private</span> <span class="ty">Instant</span> createdAt;   <span class="cm">// auto-stamped by AuditColumnListener</span>
+    <span class="kw">private</span> <span class="ty">Instant</span> updatedAt;
+    <span class="kw">private</span> <span class="ty">String</span>  createdBy;   <span class="cm">// from X-User-Id header</span>
+    <span class="kw">private</span> <span class="ty">String</span>  updatedBy;
+
+    <span class="an">@Override</span>
+    <span class="kw">protected</span> <span class="ty">Set</span>&lt;<span class="ty">ApplicationStatus</span>&gt; <span class="fn">allowedTransitions</span>(<span class="ty">ApplicationStatus</span> from) {
+        <span class="kw">return switch</span> (from) {
+            <span class="kw">case</span> DRAFT      -> <span class="ty">Set</span>.of(SUBMITTED);
+            <span class="kw">case</span> SUBMITTED  -> <span class="ty">Set</span>.of(UNDER_REVIEW, REJECTED);
+            <span class="kw">case</span> UNDER_REVIEW -> <span class="ty">Set</span>.of(APPROVED, REJECTED);
+            <span class="kw">case</span> APPROVED, REJECTED -> <span class="ty">Set</span>.of(); <span class="cm">// terminal</span>
+        };
+    }
+
+    <span class="cm">// getStatus() / setStatus() / appendAuditNote() — implement these</span>
+}
+
+<span class="cm">// Usage:</span>
+application.transition(<span class="ty">ApplicationStatus</span>.APPROVED, <span class="st">"Reviewer: documents verified"</span>);
+<span class="cm">// Throws IllegalStateTransitionException if not in allowedTransitions</span></code></pre>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="variablemapper">
+  <h2>VariableMapper</h2>
+  <p>Anti-corruption layer between raw Camunda job variables (JSON) and typed Java records. Uses Jackson 2.x (not Jackson 3.x which Boot 4 defaults to — this matters because Camunda 8.9 uses Jackson 2.x).</p>
+  <pre><code><span class="cm">// Map a JSON string → typed record</span>
+<span class="ty">MyVars</span> vars = variableMapper.map(job.getVariables(), <span class="ty">MyVars</span>.<span class="kw">class</span>);
+
+<span class="cm">// Map a Map → typed record</span>
+<span class="ty">MyVars</span> vars = variableMapper.map(rawMap, <span class="ty">MyVars</span>.<span class="kw">class</span>);
+
+<span class="cm">// Serialize a result record to a Map for Camunda variable output</span>
+<span class="ty">Map</span>&lt;<span class="ty">String</span>, <span class="ty">Object</span>&gt; out = variableMapper.toMap(resultRecord);</code></pre>
+  <p>After binding, <code>VariableMapper</code> validates all record components that are not annotated <code>@Nullable</code> are non-null. If any required field is missing from the job payload, it throws <code>VariableBindingException</code> immediately — not deep in the business logic.</p>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="camunda-starter">
+  <h2>framework-camunda-starter</h2>
+  <p>Auto-configuration class: <code>FrameworkCamundaAutoConfiguration</code>. Activated when <code>CamundaClient</code> is on classpath.</p>
+  <h3>Beans registered</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Bean</th><th>Type</th><th>Condition</th></tr></thead>
+      <tbody>
+        <tr><td>frameworkObjectMapper</td><td>ObjectMapper (Jackson 2.x)</td><td>@ConditionalOnMissingBean(ObjectMapper.class) — backs off if you supply your own</td></tr>
+        <tr><td>processService</td><td>CamundaProcessService</td><td>@ConditionalOnBean(CamundaClient.class)</td></tr>
+        <tr><td>variableMapper</td><td>VariableMapper</td><td>@ConditionalOnBean(ObjectMapper.class)</td></tr>
+        <tr><td>idempotencyGuard</td><td>JdbcIdempotencyGuard</td><td>@ConditionalOnBean(JdbcTemplate.class)</td></tr>
+        <tr><td>outboxRelay</td><td>JdbcOutboxRelay</td><td>@ConditionalOnBean({ObjectMapper, JdbcTemplate, ProcessService})</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <h3>EnvironmentPostProcessor</h3>
+  <p><code>CamundaSaasDefaultsEnvironmentPostProcessor</code> injects <code>camunda.client.mode=saas</code> at the lowest priority — so your <code>application.yml</code> overrides it, but if you don't specify mode, it defaults to SaaS automatically.</p>
+  <h3>Properties under framework.camunda.*</h3>
+  <pre><code>framework:
+  camunda:
+    multi-tenant: <span class="kw">false</span>          <span class="cm"># true only for multi-tenant cluster</span>
+    worker:
+      max-jobs-active: <span class="nu">32</span>         <span class="cm"># max in-flight jobs per worker</span>
+      poll-interval: PT30S         <span class="cm"># polling frequency</span>
+      retry-backoff: PT5S          <span class="cm"># base back-off for technical retries</span>
+      default-retries: <span class="nu">3</span>          <span class="cm"># retry budget for BPMN tasks without explicit count</span></code></pre>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="security-starter">
+  <h2>framework-security-starter</h2>
+  <p>Activated when <code>org.springframework.security.oauth2.jwt.Jwt</code> is on classpath (i.e., you added <code>spring-boot-starter-oauth2-resource-server</code>).</p>
+  <h3>Beans registered</h3>
+  <p><strong>JwtAuthenticationConverter:</strong> Reads roles from the dot-path in <code>framework.security.jwt.roles-claim</code> (default: <code>realm_access.roles</code> — Keycloak shape). Prepends <code>ROLE_</code> prefix. All role strings uppercased.</p>
+  <p><strong>CorsConfigurationSource:</strong> Only when <code>framework.security.cors.enabled=true</code>. Maps to <code>/**</code>. Fully configurable via properties.</p>
+  <h3>Wiring your SecurityFilterChain</h3>
+  <p>The framework does <strong>not</strong> supply a default <code>SecurityFilterChain</code>. That's intentional — your service decides which paths need authentication. Wire the framework beans in your own chain:</p>
+  <pre><code><span class="an">@Bean</span>
+<span class="kw">public</span> <span class="ty">SecurityFilterChain</span> <span class="fn">securityFilterChain</span>(<span class="ty">HttpSecurity</span> http,
+        <span class="ty">JwtAuthenticationConverter</span> frameworkJwtAuthenticationConverter) <span class="kw">throws</span> <span class="ty">Exception</span> {
+    http
+        .oauth2ResourceServer(oauth -> oauth
+            .jwt(j -> j.jwtAuthenticationConverter(frameworkJwtAuthenticationConverter)))
+        .authorizeHttpRequests(auth -> auth
+            .requestMatchers(<span class="st">"/actuator/health/**"</span>).permitAll()
+            .anyRequest().authenticated());
+    <span class="kw">return</span> http.build();
+}</code></pre>
+  <h3>Properties</h3>
+  <pre><code>framework:
+  security:
+    jwt:
+      roles-claim: realm_access.roles   <span class="cm"># dot-path into JWT claims</span>
+      role-prefix: ROLE_
+    cors:
+      enabled: <span class="kw">false</span>
+      allowed-origins: [<span class="st">"https://app.example.com"</span>]
+      allowed-methods: [GET, POST, PUT, DELETE, OPTIONS]
+      allowed-headers: [<span class="st">"*"</span>]
+      allow-credentials: <span class="kw">false</span>
+      max-age: PT1H</code></pre>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="obs-starter">
+  <h2>framework-observability-starter</h2>
+  <h3>MdcCorrelationFilter</h3>
+  <p>Reads <code>X-Correlation-Id</code> from each HTTP request. If absent and <code>generate-if-absent=true</code>, generates a UUID. Puts it in MDC under key <code>correlationId</code>. Echoes it in the response header. Also reads <code>X-Tenant-Id</code> → MDC. Both are cleaned up in <code>finally</code>.</p>
+  <h3>FrameworkCounters</h3>
+  <p>Domain-level business metrics with consistent naming: <code>&lt;domain&gt;_&lt;state&gt;_total</code>. Not auto-registered (domain name is application-specific). Instantiate once per domain:</p>
+  <pre><code><span class="an">@Bean</span>
+<span class="kw">public</span> <span class="ty">FrameworkCounters</span> <span class="fn">orderCounters</span>(<span class="ty">MeterRegistry</span> registry) {
+    <span class="kw">return new</span> <span class="ty">FrameworkCounters</span>(registry, <span class="st">"orders"</span>);
+    <span class="cm">// Produces: orders_created_total, orders_approved_total, etc.</span>
+}
+
+<span class="cm">// Usage in domain service:</span>
+orderCounters.created();       <span class="cm">// orders_created_total++</span>
+orderCounters.approved();      <span class="cm">// orders_approved_total++</span>
+orderCounters.increment(<span class="st">"cancelled"</span>); <span class="cm">// orders_cancelled_total++</span></code></pre>
+  <h3>Properties</h3>
+  <pre><code>framework:
+  observability:
+    mdc:
+      enabled: <span class="kw">true</span>
+      header-name: X-Correlation-Id
+      generate-if-absent: <span class="kw">true</span>
+      tenant-id-header-name: X-Tenant-Id
+    metrics:
+      business-counter-prefix: <span class="st">""</span>  <span class="cm"># your domain name</span></code></pre>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="data-starter">
+  <h2>framework-data-starter</h2>
+  <h3>AuditColumnListener</h3>
+  <p>JPA entity listener. Reflectively stamps <code>createdAt</code>, <code>updatedAt</code>, <code>createdBy</code>, <code>updatedBy</code> on your entity on <code>@PrePersist</code> and <code>@PreUpdate</code>. Fields that don't exist are silently skipped. User identity comes from the <code>X-User-Id</code> request header. Null-safe — never throws, logs at DEBUG on error.</p>
+  <pre><code><span class="an">@Entity</span>
+<span class="an">@EntityListeners</span>(<span class="ty">AuditColumnListener</span>.<span class="kw">class</span>)  <span class="cm">// add this</span>
+<span class="kw">public class</span> <span class="ty">MyEntity</span> {
+    <span class="kw">private</span> <span class="ty">Instant</span> createdAt;
+    <span class="kw">private</span> <span class="ty">Instant</span> updatedAt;
+    <span class="kw">private</span> <span class="ty">String</span>  createdBy;
+    <span class="kw">private</span> <span class="ty">String</span>  updatedBy;
+}</code></pre>
+  <h3>FlywayNamingConventionValidator</h3>
+  <p>A Flyway <code>Callback</code> that fires at <code>BEFORE_MIGRATE</code> and validates all migration files match <code>V&lt;version&gt;__&lt;snake_case&gt;.sql</code>. Enabled by default. Disable with <code>framework.data.flyway.enforce-naming-convention=false</code>.</p>
+  <h3>EnvironmentPostProcessor Defaults</h3>
+  <p>Sets at lowest priority: <code>hibernate.ddl-auto=validate</code> (not create/update!), <code>open-in-view=false</code>. These are safe production defaults.</p>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="web-starter">
+  <h2>framework-web-starter</h2>
+  <h3>Response&lt;T&gt;</h3>
+  <p>Consistent response envelope for every successful REST endpoint. Every response looks like:</p>
+  <pre><code>{
+  <span class="st">"data"</span>: { <span class="cm">/* your DTO */</span> },
+  <span class="st">"meta"</span>: {
+    <span class="st">"correlationId"</span>: <span class="st">"abc-123-def"</span>,
+    <span class="st">"timestamp"</span>: <span class="st">"2026-07-21T10:15:30.123456Z"</span>
+  }
+}</code></pre>
+  <pre><code><span class="cm">// In your controller:</span>
+<span class="an">@GetMapping</span>(<span class="st">"/{id}"</span>)
+<span class="kw">public</span> <span class="ty">Response</span>&lt;<span class="ty">OrderDto</span>&gt; <span class="fn">getOrder</span>(<span class="an">@PathVariable</span> <span class="ty">String</span> id) {
+    <span class="kw">return</span> <span class="ty">Response</span>.ok(orderService.find(id));  <span class="cm">// correlationId auto from MDC</span>
+}</code></pre>
+  <h3>GlobalExceptionHandler — HTTP Status Mapping</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Exception</th><th>HTTP Status</th><th>Extra</th></tr></thead>
+      <tbody>
+        <tr><td>MethodArgumentNotValidException</td><td>400 Bad Request</td><td>fieldErrors array with field/message/rejectedValue per error</td></tr>
+        <tr><td>ConstraintViolationException</td><td>400 Bad Request</td><td>violations array with propertyPath/message/invalidValue</td></tr>
+        <tr><td>BusinessException</td><td>422 Unprocessable Entity</td><td>errorCode property in ProblemDetail</td></tr>
+        <tr><td>RetryableException</td><td>503 Service Unavailable</td><td>Retry-After: 5 header</td></tr>
+        <tr><td>NonRetryableException</td><td>500 Internal Server Error</td><td>errorCode in body</td></tr>
+        <tr><td>TechnicalException (abstract catch-all)</td><td>500</td><td>errorCode in body</td></tr>
+        <tr><td>Exception (last resort)</td><td>500</td><td>NO internal detail leaked. Logged at ERROR with full stack.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Every ProblemDetail response also includes <code>correlationId</code> (from MDC) and <code>timestamp</code>. Disable with <code>framework.web.exception-handler-enabled=false</code>.</p>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="test-module">
+  <h2>framework-test</h2>
+  <h3>ArchitectureRules (6 constants)</h3>
+  <p>Add to your service's test module as <code>&lt;scope&gt;test&lt;/scope&gt;</code>. Reference the rule constants in a JUnit 5 <code>@AnalyzeClasses</code> test:</p>
+  <pre><code><span class="an">@AnalyzeClasses</span>(packages = <span class="st">"com.aaseya.myservice"</span>)
+<span class="kw">class</span> <span class="ty">MyServiceArchitectureTest</span> {
+    <span class="an">@ArchTest</span>
+    <span class="kw">static final</span> <span class="ty">ArchRule</span> layering = <span class="ty">ArchitectureRules</span>.WEB_AND_WORKERS_MUST_NOT_ACCESS_INFRASTRUCTURE;
+    <span class="an">@ArchTest</span>
+    <span class="kw">static final</span> <span class="ty">ArchRule</span> camundaBoundary = <span class="ty">ArchitectureRules</span>.ONLY_INFRASTRUCTURE_CAMUNDA_MAY_IMPORT_CAMUNDA_CLIENT;
+    <span class="an">@ArchTest</span>
+    <span class="kw">static final</span> <span class="ty">ArchRule</span> domainIsolation = <span class="ty">ArchitectureRules</span>.DOMAIN_MUST_NOT_IMPORT_SPRING_WEB_OR_CAMUNDA;
+    <span class="an">@ArchTest</span>
+    <span class="kw">static final</span> <span class="ty">ArchRule</span> noTxOnControllers = <span class="ty">ArchitectureRules</span>.REST_CONTROLLERS_MUST_NOT_BE_TRANSACTIONAL;
+    <span class="an">@ArchTest</span>
+    <span class="kw">static final</span> <span class="ty">ArchRule</span> noEntityExposure = <span class="ty">ArchitectureRules</span>.CONTROLLER_METHODS_MUST_NOT_EXPOSE_ENTITIES;
+    <span class="an">@ArchTest</span>
+    <span class="kw">static final</span> <span class="ty">ArchRule</span> constructorInject = <span class="ty">ArchitectureRules</span>.USE_CONSTRUCTOR_INJECTION;
+}</code></pre>
+  <h3>CamundaScenarioTestBase</h3>
+  <p>Extend this in process-scenario integration tests. Provides <code>camundaClient</code> and <code>testContext</code> (the in-memory engine). <code>startProcess(bpmnId, vars)</code> is a convenience helper.</p>
+  <h3>JdbcTemplateTestFactory</h3>
+  <p>Creates H2-backed <code>JdbcTemplate</code> instances for unit-testing JDBC-dependent code without a full Spring context.</p>
+  <h3>MdcAssertions</h3>
+  <p>Helpers to assert that MDC keys have been correctly set and cleared — catches MDC leaks across tests.</p>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="howstart">
+  <h2>How To Start — Step by Step</h2>
+
+  <h3>Prerequisites Checklist</h3>
+  <ul>
+    <li>Java 21 — verify: <code>java -version</code> must show 21.x</li>
+    <li>Maven 3.9+ — verify: <code>mvn -v</code></li>
+    <li>Git + IDE (IntelliJ IDEA recommended for Java 21 records and sealed interfaces)</li>
+    <li>Camunda 8.9 SaaS account at <a href="https://console.camunda.io" style="color:var(--accent3)">console.camunda.io</a> — provision a cluster, create an OAuth client, note the <code>cluster-id</code>, <code>region</code>, <code>client-id</code>, <code>client-secret</code></li>
+    <li>PostgreSQL 16 (or Docker to run it locally)</li>
+  </ul>
+
+  <h3>Step 1 — Clone &amp; Configure Credentials</h3>
+  <pre><code><span class="cm"># Unzip / clone the repo root</span>
+cp .env.example .env
+<span class="cm"># Fill in your values:</span>
+CAMUNDA_CLIENT_ID=&lt;from Camunda console&gt;
+CAMUNDA_CLIENT_SECRET=&lt;from Camunda console&gt;
+CAMUNDA_CLUSTER_ID=&lt;your-cluster-id&gt;
+CAMUNDA_REGION=&lt;e.g. bru-2&gt;</code></pre>
+
+  <h3>Step 2 — Build All Modules</h3>
+  <pre><code>mvn verify
+<span class="cm"># Expected: BUILD SUCCESS — 183 tests passing (0 failures)</span>
+<span class="cm"># Fat jar at: service-template/target/service-template-0.1.0-SNAPSHOT.jar</span></code></pre>
+
+  <h3>Step 3 — Run the Scaffold (local profile = H2 in-memory)</h3>
+  <pre><code><span class="cm"># Bash / Git Bash / WSL</span>
+set -a &amp;&amp; source .env &amp;&amp; set +a
+mvn spring-boot:run -pl service-template -Dspring-boot.run.profiles=local
+
+<span class="cm"># PowerShell</span>
+Get-Content .env | ForEach-Object {
+    if ($_ -match '^\s*([^#=]+?)\s*=\s*(.*)$') {
+        [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2])
+    }
+}
+mvn spring-boot:run -pl service-template "-Dspring-boot.run.profiles=local"</code></pre>
+
+  <h3>Step 4 — Verify Health</h3>
+  <pre><code><span class="cm"># Should return {"status":"UP"}</span>
+curl http://localhost:8080/actuator/health
+
+<span class="cm"># Should return {"status":"UP","groups":["liveness","readiness"]}</span>
+curl http://localhost:8080/actuator/health/liveness</code></pre>
+
+  <div class="callout success">
+    <span class="callout-icon">✅</span>
+    <span>App log shows Camunda cluster connection. Flyway creates <code>worker_execution</code> and <code>process_outbox</code> tables in H2. No jobs pulled (no workers registered yet — expected).</span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="scaffold">
+  <h2>Scaffold a New Service from service-template</h2>
+
+  <div class="flow">
+    <div class="flow-step">
+      <div class="flow-line"><div class="flow-circle">1</div><div class="flow-connector"></div></div>
+      <div class="flow-content">
+        <h4>Copy service-template/</h4>
+        <pre><code>cp -r service-template/ ../booking-service/</code></pre>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-line"><div class="flow-circle">2</div><div class="flow-connector"></div></div>
+      <div class="flow-content">
+        <h4>Rename base package</h4>
+        <p>Rename <code>com.aaseya.camunda.service.template</code> → <code>com.aaseya.camunda.service.booking</code> across all source files and the <code>pom.xml</code> <code>&lt;mainClass&gt;</code>.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-line"><div class="flow-circle">3</div><div class="flow-connector"></div></div>
+      <div class="flow-content">
+        <h4>Add starters you need</h4>
+        <pre><code><span class="cm">&lt;!-- Always included transitively via framework-camunda-starter --&gt;</span>
+<span class="cm">&lt;!-- framework-core is transitive --&gt;</span>
+
+<span class="cm">&lt;!-- Add selectively: --&gt;</span>
+&lt;dependency&gt;
+  &lt;groupId&gt;com.aaseya.camunda&lt;/groupId&gt;
+  &lt;artifactId&gt;framework-security-starter&lt;/artifactId&gt;
+&lt;/dependency&gt;
+&lt;dependency&gt;
+  &lt;groupId&gt;com.aaseya.camunda&lt;/groupId&gt;
+  &lt;artifactId&gt;framework-observability-starter&lt;/artifactId&gt;
+&lt;/dependency&gt;
+&lt;dependency&gt;
+  &lt;groupId&gt;com.aaseya.camunda&lt;/groupId&gt;
+  &lt;artifactId&gt;framework-data-starter&lt;/artifactId&gt;
+&lt;/dependency&gt;
+&lt;dependency&gt;
+  &lt;groupId&gt;com.aaseya.camunda&lt;/groupId&gt;
+  &lt;artifactId&gt;framework-web-starter&lt;/artifactId&gt;
+&lt;/dependency&gt;
+&lt;dependency&gt;
+  &lt;groupId&gt;com.aaseya.camunda&lt;/groupId&gt;
+  &lt;artifactId&gt;framework-test&lt;/artifactId&gt;
+  &lt;scope&gt;test&lt;/scope&gt;
+&lt;/dependency&gt;</code></pre>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-line"><div class="flow-circle">4</div><div class="flow-connector"></div></div>
+      <div class="flow-content">
+        <h4>Add your package structure</h4>
+        <pre><code>src/main/java/com/aaseya/camunda/service/booking/
+├── Application.java              <span class="cm">// @SpringBootApplication @EnableScheduling</span>
+├── web/                          <span class="cm">// @RestController classes (no @Transactional!)</span>
+├── workers/                      <span class="cm">// @JobWorker classes extending BaseWorker</span>
+├── domain/                       <span class="cm">// Pure business logic, entities, enums</span>
+└── infrastructure/
+    ├── camunda/                  <span class="cm">// Only place that may import io.camunda.*</span>
+    └── persistence/              <span class="cm">// JPA repositories</span>
+
+src/main/resources/
+├── processes/                    <span class="cm">// Your .bpmn files go here</span>
+└── db/migration/
+    ├── V1__framework_tables.sql  <span class="cm">// Framework tables — never touch</span>
+    └── V2__booking_tables.sql    <span class="cm">// Your domain tables</span></code></pre>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-line"><div class="flow-circle">5</div><div class="flow-connector"></div></div>
+      <div class="flow-content">
+        <h4>Deploy your BPMN to Camunda</h4>
+        <p>Design your process in Camunda Modeler. Place <code>.bpmn</code> file in <code>src/main/resources/processes/</code>. Configure <code>@JobWorker(type="...")}</code> to match <code>&lt;zeebe:taskDefinition type="..."/&gt;</code> in each service task.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="writeworker">
+  <h2>Write a Worker — Complete Example</h2>
+  <pre><code><span class="cm">// 1. Define the typed variable record</span>
+<span class="kw">public record</span> <span class="ty">NotifyApplicantVars</span>(
+    <span class="ty">String</span> businessKey,    <span class="cm">// required — idempotency key</span>
+    <span class="ty">String</span> applicantEmail, <span class="cm">// required</span>
+    <span class="ty">String</span> applicationId,  <span class="cm">// required</span>
+    <span class="an">@Nullable</span> <span class="ty">String</span> reason <span class="cm">// optional</span>
+) {}
+
+<span class="cm">// 2. Implement the worker</span>
+<span class="an">@Component</span>
+<span class="kw">public class</span> <span class="ty">NotifyApplicantWorker</span> <span class="kw">extends</span> <span class="ty">BaseWorker</span>&lt;<span class="ty">NotifyApplicantVars</span>&gt; {
+
+    <span class="kw">private final</span> <span class="ty">EmailService</span> emailService;
+
+    <span class="kw">public</span> <span class="fn">NotifyApplicantWorker</span>(<span class="ty">EmailService</span> emailService,
+            <span class="ty">VariableMapper</span> mapper, <span class="ty">IdempotencyGuard</span> guard, <span class="ty">MeterRegistry</span> registry) {
+        <span class="kw">super</span>(mapper, guard, registry);
+        <span class="kw">this</span>.emailService = emailService;
+    }
+
+    <span class="an">@Override</span>
+    <span class="kw">protected</span> <span class="ty">Class</span>&lt;<span class="ty">NotifyApplicantVars</span>&gt; <span class="fn">varsType</span>() {
+        <span class="kw">return</span> <span class="ty">NotifyApplicantVars</span>.<span class="kw">class</span>;
+    }
+
+    <span class="an">@Override</span>
+    <span class="kw">protected</span> <span class="ty">WorkResult</span> <span class="fn">doWork</span>(<span class="ty">NotifyApplicantVars</span> vars, <span class="ty">ActivatedJob</span> job) {
+        <span class="kw">try</span> {
+            emailService.send(vars.applicantEmail(), <span class="st">"Application Update"</span>, vars.reason());
+            <span class="kw">return</span> <span class="ty">WorkResult</span>.completed(<span class="ty">Map</span>.of(<span class="st">"notificationSent"</span>, <span class="kw">true</span>));
+        } <span class="kw">catch</span> (<span class="ty">EmailTemporaryException</span> e) {
+            <span class="kw">throw new</span> <span class="ty">RetryableException</span>(<span class="st">"EMAIL_UNAVAILABLE"</span>, e.getMessage(), e);
+        } <span class="kw">catch</span> (<span class="ty">EmailConfigException</span> e) {
+            <span class="kw">throw new</span> <span class="ty">NonRetryableException</span>(<span class="st">"EMAIL_CONFIG_ERROR"</span>, e.getMessage(), e);
+        }
+    }
+
+    <span class="cm">// 3. Annotate the entry-point and delegate to framework execute()</span>
+    <span class="an">@JobWorker</span>(type = <span class="st">"notify-applicant"</span>, autoComplete = <span class="kw">false</span>)
+    <span class="kw">public void</span> <span class="fn">handle</span>(<span class="ty">JobClient</span> client, <span class="ty">ActivatedJob</span> job) {
+        execute(client, job);
+    }
+}</code></pre>
+  <div class="callout info">
+    <span class="callout-icon">ℹ️</span>
+    <span>Always use <code>autoComplete = false</code> on <code>@JobWorker</code>. The framework calls <code>newCompleteCommand()</code> (or error/throw) itself inside <code>execute()</code>. If you set <code>autoComplete = true</code>, Camunda will auto-complete before your result is dispatched — double-completion error.</span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="saga">
+  <h2>Saga Pattern — Orchestration-Based</h2>
+  <p>Sagas in this framework are built in BPMN using subprocess + compensation boundary events. The framework never does hand-coded rollback — BPMN diagrams declare compensation.</p>
+
+  <h3>Saga Steps</h3>
+  <pre><code><span class="cm">// Step worker (forward path)</span>
+<span class="kw">return</span> <span class="ty">WorkResult</span>.completed(<span class="ty">Map</span>.of(<span class="st">"bookingId"</span>, booking.getId()));
+
+<span class="cm">// Compensation worker (rollback path, triggered by BPMN compensation event)</span>
+<span class="an">@JobWorker</span>(type = <span class="st">"cancel-booking-compensate"</span>, autoComplete = <span class="kw">false</span>)
+<span class="kw">public void</span> <span class="fn">handleCompensate</span>(<span class="ty">JobClient</span> client, <span class="ty">ActivatedJob</span> job) {
+    execute(client, job);
+}
+
+<span class="an">@Override</span>
+<span class="kw">protected</span> <span class="ty">WorkResult</span> <span class="fn">doWork</span>(<span class="ty">CancelVars</span> vars, <span class="ty">ActivatedJob</span> job) {
+    bookingService.cancel(vars.bookingId());
+    <span class="kw">return</span> <span class="ty">WorkResult</span>.compensated(); <span class="cm">// ← signals saga rollback step</span>
+}</code></pre>
+
+  <h3>Message Correlation</h3>
+  <pre><code><span class="cm">// Correlating a message to a waiting intermediate catch event:</span>
+processService.correlate(<span class="kw">new</span> <span class="ty">CorrelateMessageCommand</span>(
+    <span class="st">"PaymentReceived"</span>,          <span class="cm">// BPMN message name</span>
+    <span class="st">"BOOKING-001"</span>,               <span class="cm">// must match the process variable used as correlation key</span>
+    <span class="ty">Map</span>.of(<span class="st">"paymentRef"</span>, <span class="st">"PAY-789"</span>),
+    <span class="kw">null</span>                         <span class="cm">// tenantId</span>
+));
+
+<span class="cm">// Publishing to a message start event (broadcast):</span>
+processService.publish(<span class="ty">PublishMessageCommand</span>.of(<span class="st">"DocumentReceived"</span>));</code></pre>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="testing">
+  <h2>Testing Guide</h2>
+
+  <h3>Unit Testing a Worker</h3>
+  <pre><code><span class="kw">class</span> <span class="ty">ValidateApplicationWorkerTest</span> {
+
+    <span class="ty">VariableMapper</span> mapper = <span class="ty">VariableMapper</span>.createDefault();
+    <span class="ty">IdempotencyGuard</span> guard = mock(<span class="ty">IdempotencyGuard</span>.<span class="kw">class</span>);
+    <span class="ty">MeterRegistry</span> registry = <span class="kw">new</span> <span class="ty">SimpleMeterRegistry</span>();
+    <span class="ty">ApplicationDomainService</span> domainService = mock(<span class="ty">ApplicationDomainService</span>.<span class="kw">class</span>);
+    <span class="ty">ValidateApplicationWorker</span> worker = <span class="kw">new</span> <span class="ty">ValidateApplicationWorker</span>(domainService, mapper, guard, registry);
+
+    <span class="an">@Test</span>
+    <span class="kw">void</span> <span class="fn">returns_businessError_when_validation_fails</span>() {
+        <span class="kw">var</span> vars = <span class="kw">new</span> <span class="ty">ValidateApplicationVars</span>(<span class="st">"BK-001"</span>, <span class="st">"APP-001"</span>, <span class="kw">null</span>);
+        when(domainService.validate(<span class="st">"APP-001"</span>)).thenReturn(<span class="ty">ValidationResult</span>.invalid(<span class="st">"Missing docs"</span>));
+
+        <span class="ty">WorkResult</span> result = worker.doWork(vars, mockJob());
+
+        assertThat(result).isInstanceOf(<span class="ty">WorkResult</span>.<span class="ty">BusinessError</span>.<span class="kw">class</span>);
+        assertThat(((<span class="ty">WorkResult</span>.<span class="ty">BusinessError</span>) result).errorCode()).isEqualTo(<span class="st">"VALIDATION_FAILED"</span>);
+    }
+}</code></pre>
+
+  <h3>Process Scenario Test</h3>
+  <pre><code><span class="an">@SpringBootTest</span>
+<span class="kw">class</span> <span class="ty">BookingProcessScenarioTest</span> <span class="kw">extends</span> <span class="ty">CamundaScenarioTestBase</span> {
+
+    <span class="an">@Test</span>
+    <span class="kw">void</span> <span class="fn">happyPath_processCompletes</span>() <span class="kw">throws</span> <span class="ty">Exception</span> {
+        testContext.deployProcess(<span class="st">"booking-process.bpmn"</span>);
+        <span class="kw">long</span> key = startProcess(<span class="st">"Process_Booking"</span>, <span class="ty">Map</span>.of(
+            <span class="st">"businessKey"</span>, <span class="st">"BK-001"</span>,
+            <span class="st">"applicantId"</span>, <span class="st">"APP-001"</span>
+        ));
+        <span class="cm">// Use Camunda assertions (8.9 API)</span>
+        <span class="ty">CamundaAssert</span>.assertThat(
+            <span class="ty">ProcessInstanceSelectors</span>.byKey(key)
+        ).isCompleted();
+    }
+}</code></pre>
+
+  <h3>ArchUnit Test</h3>
+  <pre><code><span class="an">@AnalyzeClasses</span>(packages = <span class="st">"com.aaseya.camunda.service.booking"</span>)
+<span class="kw">class</span> <span class="ty">BookingServiceArchTest</span> {
+    <span class="an">@ArchTest</span> <span class="kw">static final</span> <span class="ty">ArchRule</span> l = <span class="ty">ArchitectureRules</span>.WEB_AND_WORKERS_MUST_NOT_ACCESS_INFRASTRUCTURE;
+    <span class="an">@ArchTest</span> <span class="kw">static final</span> <span class="ty">ArchRule</span> c = <span class="ty">ArchitectureRules</span>.ONLY_INFRASTRUCTURE_CAMUNDA_MAY_IMPORT_CAMUNDA_CLIENT;
+    <span class="an">@ArchTest</span> <span class="kw">static final</span> <span class="ty">ArchRule</span> d = <span class="ty">ArchitectureRules</span>.DOMAIN_MUST_NOT_IMPORT_SPRING_WEB_OR_CAMUNDA;
+    <span class="an">@ArchTest</span> <span class="kw">static final</span> <span class="ty">ArchRule</span> t = <span class="ty">ArchitectureRules</span>.REST_CONTROLLERS_MUST_NOT_BE_TRANSACTIONAL;
+    <span class="an">@ArchTest</span> <span class="kw">static final</span> <span class="ty">ArchRule</span> e = <span class="ty">ArchitectureRules</span>.CONTROLLER_METHODS_MUST_NOT_EXPOSE_ENTITIES;
+    <span class="an">@ArchTest</span> <span class="kw">static final</span> <span class="ty">ArchRule</span> i = <span class="ty">ArchitectureRules</span>.USE_CONSTRUCTOR_INJECTION;
+}</code></pre>
+
+  <h3>Run All Tests</h3>
+  <pre><code><span class="cm"># All modules</span>
+mvn test
+
+<span class="cm"># Single module</span>
+mvn test -pl framework-core
+
+<span class="cm"># With coverage report</span>
+mvn verify
+open framework-core/target/site/jacoco/index.html</code></pre>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="postman">
+  <h2>Postman Testing Guide</h2>
+
+  <h3>Environment Variables to Set in Postman</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Variable</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>base_url</td><td>http://localhost:8080</td></tr>
+        <tr><td>access_token</td><td>(from Keycloak — see OAuth2 flow below)</td></tr>
+        <tr><td>correlation_id</td><td>test-corr-{{$guid}}</td></tr>
+        <tr><td>tenant_id</td><td>default</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Headers to Include on Every Request</h3>
+  <pre><code>Authorization: Bearer {{access_token}}
+X-Correlation-Id: {{correlation_id}}
+X-User-Id: postman-tester
+Content-Type: application/json</code></pre>
+
+  <h3>Get a Token from Keycloak</h3>
+  <div class="pm-endpoint">
+    <div class="pm-header">
+      <span class="method POST">POST</span>
+      <span class="pm-path">{{keycloak_url}}/realms/{{realm}}/protocol/openid-connect/token</span>
+    </div>
+    <div class="pm-body">
+      <pre style="margin:0"><code>Content-Type: application/x-www-form-urlencoded
+
+grant_type=password
+client_id={{client_id}}
+username={{username}}
+password={{password}}</code></pre>
+      <p style="margin-top:.5rem;font-size:12px;color:var(--muted)">Save <code>access_token</code> from response to the Postman environment.</p>
+    </div>
+  </div>
+
+  <h3>Core API Endpoints (add to your service)</h3>
+
+  <div class="pm-endpoint">
+    <div class="pm-header">
+      <span class="method GET">GET</span>
+      <span class="pm-path">{{base_url}}/actuator/health</span>
+      <span class="pm-desc">Health check — no auth needed</span>
+    </div>
+    <div class="pm-body">
+      <p style="font-size:12px;color:var(--muted)">Expected: <code>{"status":"UP"}</code></p>
+    </div>
+  </div>
+
+  <div class="pm-endpoint">
+    <div class="pm-header">
+      <span class="method GET">GET</span>
+      <span class="pm-path">{{base_url}}/actuator/prometheus</span>
+      <span class="pm-desc">Scrape metrics</span>
+    </div>
+    <div class="pm-body">
+      <p style="font-size:12px;color:var(--muted)">Returns Prometheus text format. Look for <code>framework_job_completed_total</code>, <code>framework_job_business_error_total</code>, etc.</p>
+    </div>
+  </div>
+
+  <div class="pm-endpoint">
+    <div class="pm-header">
+      <span class="method POST">POST</span>
+      <span class="pm-path">{{base_url}}/api/bookings</span>
+      <span class="pm-desc">Start a process (example endpoint you implement)</span>
+    </div>
+    <div class="pm-body">
+      <pre style="margin:0"><code>{
+  <span class="st">"applicantId"</span>: <span class="st">"APP-001"</span>,
+  <span class="st">"amount"</span>: <span class="nu">5000.00</span>,
+  <span class="st">"type"</span>: <span class="st">"STANDARD"</span>
+}</code></pre>
+      <p style="margin-top:.5rem;font-size:12px;color:var(--muted)">Expected: <code>200 {"data": {"bookingId": "BK-001", "processInstanceKey": 12345678}, "meta": {"correlationId": "...", "timestamp": "..."}}</code></p>
+    </div>
+  </div>
+
+  <h3>Test Validation Errors (expect 400)</h3>
+  <div class="pm-endpoint">
+    <div class="pm-header">
+      <span class="method POST">POST</span>
+      <span class="pm-path">{{base_url}}/api/bookings</span>
+      <span class="pm-desc">Missing required field → 400</span>
+    </div>
+    <div class="pm-body">
+      <pre style="margin:0"><code>{ "amount": 5000 }
+<span class="cm">/* applicantId missing — triggers @NotBlank validation */</span></code></pre>
+      <p style="margin-top:.5rem;font-size:12px;color:var(--muted)">Expected: <code>400 {"type":"about:blank","title":"Validation error","status":400,"fieldErrors":[{"field":"applicantId","message":"must not be blank","rejectedValue":"null"}],...}</code></p>
+    </div>
+  </div>
+
+  <h3>Test Business Error (expect 422)</h3>
+  <div class="pm-endpoint">
+    <div class="pm-header">
+      <span class="method POST">POST</span>
+      <span class="pm-path">{{base_url}}/api/bookings/{{bookingId}}/approve</span>
+      <span class="pm-desc">Already approved → 422</span>
+    </div>
+    <div class="pm-body">
+      <p style="font-size:12px;color:var(--muted)">Expected: <code>422 {"status":422,"title":"Business rule violation","detail":"Application already approved","errorCode":"INVALID_STATE_TRANSITION",...}</code></p>
+    </div>
+  </div>
+
+  <h3>Postman Pre-request Script (auto-refresh token)</h3>
+  <pre><code><span class="cm">// Add to collection Pre-request Script:</span>
+pm.sendRequest({
+    url: pm.environment.get(<span class="st">'keycloak_url'</span>) + <span class="st">'/protocol/openid-connect/token'</span>,
+    method: <span class="st">'POST'</span>,
+    header: { <span class="st">'Content-Type'</span>: <span class="st">'application/x-www-form-urlencoded'</span> },
+    body: {
+        mode: <span class="st">'urlencoded'</span>,
+        urlencoded: [
+            { key: <span class="st">'grant_type'</span>, value: <span class="st">'password'</span> },
+            { key: <span class="st">'client_id'</span>, value: pm.environment.get(<span class="st">'client_id'</span>) },
+            { key: <span class="st">'username'</span>, value: pm.environment.get(<span class="st">'username'</span>) },
+            { key: <span class="st">'password'</span>, value: pm.environment.get(<span class="st">'password'</span>) }
+        ]
+    }
+}, (err, res) => {
+    pm.environment.set(<span class="st">'access_token'</span>, res.json().access_token);
+});</code></pre>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="ui-testing">
+  <h2>UI Testing in Camunda Operate / Tasklist</h2>
+
+  <h3>Camunda Operate — Monitor Process Instances</h3>
+  <ul>
+    <li>Log in at <code>https://operate.camunda.io</code> (SaaS)</li>
+    <li>Go to <strong>Process Instances</strong> → find your process by BPMN ID</li>
+    <li>Click an instance to see the BPMN with current active element highlighted</li>
+    <li>Check <strong>Variables</strong> tab — see all process variables including your worker outputs</li>
+    <li>Check <strong>Incidents</strong> tab — if a job exhausted retries, the incident shows here with the exception message</li>
+    <li>Check <strong>Audit Log</strong> — every element activation, completion, error throw is timestamped</li>
+  </ul>
+
+  <h3>Camunda Tasklist — Human Tasks</h3>
+  <ul>
+    <li>Log in at <code>https://tasklist.camunda.io</code> (SaaS)</li>
+    <li>Tasks assigned to a candidate group appear for users who are members of that Keycloak group</li>
+    <li>Complete a user task through the UI — the process resumes automatically</li>
+    <li>Or complete programmatically: <code>processService.completeActiveUserTask(instanceKey, vars)</code></li>
+  </ul>
+
+  <h3>Resolving Incidents in Operate</h3>
+  <ul>
+    <li>Click the incident in Operate → view the full exception message</li>
+    <li>Fix the root cause (code, config, external service)</li>
+    <li>Click <strong>Retry</strong> on the incident — Camunda re-activates the job with the remaining retry count</li>
+    <li>Or <strong>Cancel</strong> the instance if it cannot be recovered</li>
+  </ul>
+
+  <h3>Check Your Metrics in Prometheus / Grafana</h3>
+  <pre><code><span class="cm"># Prometheus queries for key framework counters:</span>
+framework_job_completed_total{type="validate-application"}
+framework_job_business_error_total{type="notify-applicant", code="EMAIL_UNAVAILABLE"}
+framework_job_replayed_total          <span class="cm"># idempotency guard triggered</span>
+orders_created_total                  <span class="cm"># domain counter from FrameworkCounters</span></code></pre>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="config-ref">
+  <h2>Configuration Reference</h2>
+  <pre><code>spring:
+  application:
+    name: my-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/my_service}
+    username: ${DB_USER:my_service}
+    password: ${DB_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: validate      <span class="cm"># NEVER use create / create-drop in production</span>
+    open-in-view: <span class="kw">false</span>
+
+camunda:
+  client:
+    mode: saas               <span class="cm"># set by EnvironmentPostProcessor — usually no need to set</span>
+    auth:
+      client-id: ${CAMUNDA_CLIENT_ID}
+      client-secret: ${CAMUNDA_CLIENT_SECRET}
+    cloud:
+      cluster-id: ${CAMUNDA_CLUSTER_ID}
+      region: ${CAMUNDA_REGION}
+
+framework:
+  camunda:
+    multi-tenant: <span class="kw">false</span>
+    worker:
+      max-jobs-active: <span class="nu">32</span>
+      poll-interval: PT30S
+      retry-backoff: PT5S
+      default-retries: <span class="nu">3</span>
+  security:
+    jwt:
+      roles-claim: realm_access.roles
+      role-prefix: ROLE_
+    cors:
+      enabled: <span class="kw">false</span>
+      allowed-origins: []
+  observability:
+    mdc:
+      enabled: <span class="kw">true</span>
+      header-name: X-Correlation-Id
+      generate-if-absent: <span class="kw">true</span>
+      tenant-id-header-name: X-Tenant-Id
+    metrics:
+      business-counter-prefix: <span class="st">""</span>
+  data:
+    audit:
+      enabled: <span class="kw">true</span>
+      created-by-header: X-User-Id
+    flyway:
+      enforce-naming-convention: <span class="kw">true</span>
+      expected-locations: [classpath:db/migration]
+  web:
+    exception-handler-enabled: <span class="kw">true</span>   <span class="cm"># set false to supply your own @RestControllerAdvice</span>
+  outbox:
+    poll-interval: PT2S              <span class="cm"># how often JdbcOutboxRelay.poll() fires</span>
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: <span class="kw">true</span>              <span class="cm"># /actuator/health/liveness + /readiness</span></code></pre>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="deploy">
+  <h2>Deploy</h2>
+  <h3>Docker Build</h3>
+  <pre><code><span class="cm"># Multi-stage build — runs from repo root</span>
+docker build -f service-template/Dockerfile -t myregistry/booking-service:1.0.0 .
+
+<span class="cm"># The Dockerfile uses:</span>
+<span class="cm"># Stage 1: maven:3.9-eclipse-temurin-21 — builds fat jar</span>
+<span class="cm"># Stage 2: eclipse-temurin:21-jre — slim runtime</span>
+<span class="cm"># Non-root USER 1000</span>
+<span class="cm"># HEALTHCHECK on /actuator/health/liveness</span>
+<span class="cm"># Layered jars for fast Docker layer caching</span></code></pre>
+
+  <h3>Helm Deploy</h3>
+  <pre><code><span class="cm"># Deploy using the generic chart with per-service values override</span>
+helm upgrade --install booking-service deploy/helm-chart \
+  -f deploy/helm-chart/values-service-template.yaml \
+  --set image.tag=1.0.0 \
+  --namespace my-namespace
+
+<span class="cm"># Chart includes:</span>
+<span class="cm"># HPA on CPU + memory</span>
+<span class="cm"># PodDisruptionBudget</span>
+<span class="cm"># NetworkPolicy (egress-only)</span>
+<span class="cm"># ServiceMonitor for Prometheus</span>
+<span class="cm"># external-secrets integration via envFrom.secretRef</span></code></pre>
+
+  <h3>GitLab CI Pipeline (9 stages)</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Stage</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td>build</td><td>mvn compile</td></tr>
+        <tr><td>test</td><td>mvn test (Surefire unit + Failsafe integration)</td></tr>
+        <tr><td>coverage-gate</td><td>JaCoCo: 80% overall, 90% on framework-core</td></tr>
+        <tr><td>sonar</td><td>SonarQube analysis</td></tr>
+        <tr><td>bpmn-integrity</td><td>tools/check-bpmn-integrity.sh (xmllint)</td></tr>
+        <tr><td>image</td><td>docker build + push to registry</td></tr>
+        <tr><td>image-scan</td><td>Trivy vulnerability scan</td></tr>
+        <tr><td>helm-lint</td><td>helm lint on the chart</td></tr>
+        <tr><td>deploy-dev</td><td>Manual trigger — helm upgrade to dev namespace + smoke test</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="troubleshoot">
+  <h2>Troubleshooting</h2>
+
+  <div class="callout critical">
+    <span class="callout-icon">🔴</span>
+    <div>
+      <strong>NoSuchBeanDefinitionException: ObjectMapper</strong><br>
+      The framework provides Jackson 2.x <code>ObjectMapper</code> via <code>@ConditionalOnMissingBean</code>. If your service supplies its own, ensure the injected type is <code>com.fasterxml.jackson.databind.ObjectMapper</code> (Jackson 2.x), not Boot 4's <code>tools.jackson.databind.JsonMapper</code> (Jackson 3.x). Camunda 8.9 uses Jackson 2.x internally.
+    </div>
+  </div>
+
+  <div class="callout critical">
+    <span class="callout-icon">🔴</span>
+    <div>
+      <strong>Health endpoint DOWN — Camunda client error</strong><br>
+      All four <code>CAMUNDA_*</code> env vars must be loaded into the process environment. Check with <code>env | grep CAMUNDA</code>. <code>CAMUNDA_REGION</code> is required and case-sensitive.
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <span class="callout-icon">⚠️</span>
+    <div>
+      <strong>Workers not picking up jobs</strong><br>
+      Verify: (a) <code>@EnableScheduling</code> is on your <code>@SpringBootApplication</code> class — required for the outbox poller. (b) Your <code>@JobWorker</code> classes are Spring beans. (c) The <code>type</code> attribute on <code>&lt;zeebe:taskDefinition type="..."/&gt;</code> in BPMN matches exactly the string in <code>@JobWorker(type = "...")</code>.
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <span class="callout-icon">⚠️</span>
+    <div>
+      <strong>Flyway migration fails</strong><br>
+      The shipped <code>V1__framework_tables.sql</code> uses <code>TEXT</code> for the <code>payload</code> column (H2 + Postgres compatible). If production Postgres needs <code>jsonb</code>, add a follow-up migration: <code>ALTER TABLE process_outbox ALTER COLUMN payload TYPE jsonb USING payload::jsonb;</code>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <span class="callout-icon">⚠️</span>
+    <div>
+      <strong>FOR UPDATE SKIP LOCKED fails in H2 tests</strong><br>
+      H2 in <code>MODE=PostgreSQL</code> accepts most Postgres syntax, but <code>FOR UPDATE SKIP LOCKED</code> may fail. Run outbox-specific tests with Testcontainers pointing at real Postgres.
+    </div>
+  </div>
+
+  <div class="callout info">
+    <span class="callout-icon">ℹ️</span>
+    <div>
+      <strong>User task not found after process start</strong><br>
+      Camunda's user task search index is eventually consistent. <code>CamundaProcessService.findActiveUserTaskKey()</code> retries 5 times with exponential backoff (200ms, 400ms, 800ms, 1600ms). If it still fails, the process may be at a different state. Check Operate.
+    </div>
+  </div>
+
+  <div class="callout info">
+    <span class="callout-icon">ℹ️</span>
+    <div>
+      <strong>MDC not showing in logs</strong><br>
+      Ensure your log pattern includes MDC keys. Example Logback pattern: <code>%d{ISO8601} [%X{correlationId}] [%X{processInstanceKey}] %-5level %logger{36} - %msg%n</code>
+    </div>
+  </div>
+
+  <h3>Useful mvn Debug Commands</h3>
+  <pre><code><span class="cm"># Dependency tree (find version conflicts)</span>
+mvn dependency:tree -pl service-template
+
+<span class="cm"># Check which auto-configurations fired</span>
+mvn spring-boot:run -pl service-template -Dspring-boot.run.profiles=local \
+  -Dspring-boot.run.jvmArguments="-Ddebug"
+
+<span class="cm"># Force redownload all snapshots</span>
+mvn verify -U
+
+<span class="cm"># Skip tests (build only)</span>
+mvn install -DskipTests</code></pre>
+</section>
+
+<hr>
+<p style="color:var(--muted);font-size:12px;text-align:center;padding:2rem 0;">
+  camunda-process-framework v0.1.1 · Aaseya IT Services (YASH Technologies) ·
+  Maintainer: <span style="color:var(--accent3)">jain.sanjay@aaseya.com</span>
+</p>
+
+</main>
+</body>
+</html>

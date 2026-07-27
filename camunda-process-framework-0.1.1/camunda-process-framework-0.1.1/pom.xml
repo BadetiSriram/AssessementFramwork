@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!-- ============================================================
+       Spring Boot 4.0.5 — the version Camunda 8.9.0 was built and
+       tested against (confirmed from its published POM).
+       Pinned; upgrade only with explicit approval from the framework
+       maintainer, since the Camunda / Spring Boot compatibility matrix
+       is version-sensitive.
+       ============================================================ -->
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>4.0.5</version>
+    <relativePath/>
+  </parent>
+
+  <groupId>com.aaseya.camunda</groupId>
+  <artifactId>camunda-process-framework</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+
+  <name>camunda-process-framework</name>
+  <description>
+    Multi-module Spring Boot 4 / Java 21 base framework for Camunda 8.9 SaaS
+    process orchestration — starters, framework-core patterns, and a runnable
+    service-template demonstrating the golden-path saga.
+  </description>
+
+  <modules>
+    <module>framework-camunda-starter</module>
+    <module>framework-core</module>
+    <module>framework-security-starter</module>
+    <module>framework-observability-starter</module>
+    <module>framework-data-starter</module>
+    <module>framework-test</module>
+    <module>framework-web-starter</module>
+    <module>service-template</module>
+  </modules>
+
+  <properties>
+    <java.version>21</java.version>
+    <maven.compiler.release>21</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+    <!-- Pinned dependency versions — change only with explicit approval -->
+    <camunda.version>8.9.0</camunda.version>
+    <resilience4j.version>2.3.0</resilience4j.version>
+    <postgresql.version>42.7.7</postgresql.version>
+    <archunit.version>1.3.0</archunit.version>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <!-- Camunda 8.9 SaaS Spring starter — the canonical client entrypoint.
+           Exposes CamundaClient (NOT ZeebeClient); uses REST protocol by default. -->
+      <dependency>
+        <groupId>io.camunda</groupId>
+        <artifactId>camunda-spring-boot-starter</artifactId>
+        <version>${camunda.version}</version>
+      </dependency>
+
+      <!-- Camunda process-test harness — used in test scope by service-template
+           and any module with scenario / integration tests. -->
+      <dependency>
+        <groupId>io.camunda</groupId>
+        <artifactId>camunda-process-test-spring</artifactId>
+        <version>${camunda.version}</version>
+        <scope>test</scope>
+      </dependency>
+
+      <!-- Resilience4j — no Boot 4-specific artifact published as of 2026-07-20;
+           the spring-boot3 artifact is compatible because Boot 4 preserves the
+           same auto-configuration protocol (org.springframework.boot.autoconfigure). -->
+      <dependency>
+        <groupId>io.github.resilience4j</groupId>
+        <artifactId>resilience4j-spring-boot3</artifactId>
+        <version>${resilience4j.version}</version>
+      </dependency>
+
+      <!-- PostgreSQL 16-compatible JDBC driver -->
+      <dependency>
+        <groupId>org.postgresql</groupId>
+        <artifactId>postgresql</artifactId>
+        <version>${postgresql.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>io.camunda</groupId>
+        <artifactId>camunda-client-java</artifactId>
+        <version>${camunda.version}</version>
+      </dependency>
+
+      <!-- ArchUnit — architecture rule testing library for unit-test layer checks. -->
+      <dependency>
+        <groupId>com.tngtech.archunit</groupId>
+        <artifactId>archunit-junit5</artifactId>
+        <version>${archunit.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+
+        <!-- Spring Boot Maven plugin — child modules that produce a fat jar
+             declare this without a version; mainClass is set per module. -->
+        <plugin>
+          <groupId>org.springframework.boot</groupId>
+          <artifactId>spring-boot-maven-plugin</artifactId>
+          <!-- version inherited from spring-boot-starter-parent -->
+        </plugin>
+
+        <!-- JaCoCo — prepare-agent on initialize so byte-code instrumentation
+             is in place before Surefire/Failsafe execute.
+             The 'check' goal (0.80 line coverage) is intentionally NOT bound
+             on the parent aggregator (no code here); child modules that produce
+             code bind it in their own <build> section. -->
+        <plugin>
+          <groupId>org.jacoco</groupId>
+          <artifactId>jacoco-maven-plugin</artifactId>
+          <version>0.8.12</version>
+          <executions>
+            <execution>
+              <id>jacoco-prepare-agent</id>
+              <phase>initialize</phase>
+              <goals>
+                <goal>prepare-agent</goal>
+              </goals>
+            </execution>
+            <execution>
+              <id>jacoco-report</id>
+              <phase>verify</phase>
+              <goals>
+                <goal>report</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
+
+        <!-- Surefire — unit tests -->
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <!-- version inherited from spring-boot-starter-parent -->
+        </plugin>
+
+        <!-- Failsafe — integration / process scenario tests -->
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-failsafe-plugin</artifactId>
+          <!-- version inherited from spring-boot-starter-parent -->
+        </plugin>
+
+      </plugins>
+    </pluginManagement>
+  </build>
+
+</project>

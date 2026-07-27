@@ -1,0 +1,166 @@
+# =============================================================================
+# Default values for camunda-service Helm chart.
+# Override per service using a values-<service-name>.yaml overlay file.
+# All secrets must be injected via envFrom.secretRef (external-secrets or
+# Kubernetes Secrets); never hardcode credentials here.
+# =============================================================================
+
+# Number of pod replicas. Must be >= 2 in production for PDB to be meaningful.
+replicaCount: 2
+
+# Container image configuration. Override repository and tag per service.
+image:
+  # Container registry and image path, e.g. registry.example.com/org/service-name
+  repository: ""
+  # Image tag, e.g. 1.2.3 or 0.1.0-SNAPSHOT. Empty string will cause Helm to
+  # fail fast — always provide this in the per-service values overlay.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+# List of pull secret names for private registries, e.g. [{name: my-registry-secret}]
+imagePullSecrets: []
+
+# Service account settings
+serviceAccount:
+  # Create a dedicated ServiceAccount for this workload (recommended).
+  create: true
+  # Annotations to add to the ServiceAccount, e.g. for IRSA / Workload Identity.
+  annotations: {}
+  # Override the auto-generated name; leave empty to use the fullname template.
+  name: ""
+
+# Pod-level security context applied to all containers in the pod.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+# Container-level security context (applied to the application container).
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# Kubernetes Service configuration.
+service:
+  type: ClusterIP
+  # Port exposed by the Service. Must match the container's server.port.
+  port: 8080
+  # Port used for actuator scraping (same as port when actuator shares the main port).
+  actuatorPort: 8080
+
+# CPU and memory resource requests/limits.
+# Tune per service; these defaults work for a typical lightly-loaded Boot service.
+resources:
+  requests:
+    cpu: "250m"
+    memory: "512Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1Gi"
+
+# Liveness, readiness, and startup probe configuration.
+# Paths correspond to Spring Boot Actuator endpoints.
+probes:
+  liveness:
+    path: /actuator/health/liveness
+    # Wait for the JVM and Spring context to start before first probe.
+    initialDelaySeconds: 60
+    periodSeconds: 30
+  readiness:
+    path: /actuator/health/readiness
+    # Readiness check begins earlier than liveness.
+    initialDelaySeconds: 20
+    periodSeconds: 10
+  startup:
+    path: /actuator/health/liveness
+    # Startup probe prevents premature restarts during slow cold starts.
+    # failureThreshold * periodSeconds = maximum startup time allowed (150s).
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    failureThreshold: 30
+
+# Horizontal Pod Autoscaler configuration.
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  # Scale out when average CPU utilization across pods exceeds this percentage.
+  targetCPUUtilizationPercentage: 70
+  # Scale out when average memory utilization across pods exceeds this percentage.
+  targetMemoryUtilizationPercentage: 80
+  # Optional per-service custom metrics (e.g. active job backlog from Prometheus).
+  # Each entry: { name: <metric-name>, target: <averageValue> }
+  # Example:
+  #   customMetrics:
+  #     - name: framework_job_active_backlog
+  #       target: 10
+  customMetrics: []
+
+# PodDisruptionBudget — ensures at least minAvailable pods remain during
+# voluntary disruptions (rolling upgrades, node drains).
+pdb:
+  enabled: true
+  minAvailable: 1
+
+# NetworkPolicy — restricts pod egress/ingress at the CNI level.
+# egressPorts: list of {port, protocol} entries for allowed outbound traffic.
+# DNS (UDP/53) egress to kube-system is always added automatically.
+networkPolicy:
+  enabled: true
+  egressPorts:
+    - port: 5432
+      protocol: TCP   # PostgreSQL
+    - port: 443
+      protocol: TCP   # HTTPS — Camunda SaaS REST API + IdP token endpoint
+
+# Prometheus Operator ServiceMonitor for automatic metrics scraping.
+serviceMonitor:
+  enabled: true
+  interval: 30s
+  scrapeTimeout: 10s
+  path: /actuator/prometheus
+
+# Additional environment variables injected directly into the container.
+# Supports both literal values and valueFrom (secretKeyRef, configMapKeyRef, fieldRef).
+# Example:
+#   env:
+#     - name: LOG_LEVEL
+#       value: "INFO"
+#     - name: POD_NAME
+#       valueFrom:
+#         fieldRef:
+#           fieldPath: metadata.name
+env: []
+
+# References to Kubernetes Secrets (or ExternalSecrets-managed secrets) that
+# are injected as environment variables via envFrom.
+# Example:
+#   envFrom:
+#     - secretRef:
+#         name: my-service-camunda-secrets
+envFrom: []
+
+# ConfigMap key/value pairs that are exposed as environment variables via
+# envFrom.configMapRef. Only a ConfigMap is created when data is non-empty.
+# Example:
+#   configMap:
+#     data:
+#       SERVER_PORT: "8080"
+#       MANAGEMENT_METRICS_EXPORT_PROMETHEUS_ENABLED: "true"
+configMap:
+  data: {}
+
+# Time Kubernetes waits for in-flight requests to drain before sending SIGKILL.
+# Must be greater than preStop.sleepSeconds to allow graceful shutdown.
+terminationGracePeriodSeconds: 60
+
+# preStop lifecycle hook injects a sleep before the container receives SIGTERM.
+# This gives the load balancer time to remove the pod from rotation before
+# the application starts shutting down (prevents in-flight request drops).
+# sleepSeconds should be > the LB endpoint deregistration latency and < terminationGracePeriodSeconds.
+preStop:
+  enabled: true
+  sleepSeconds: 35

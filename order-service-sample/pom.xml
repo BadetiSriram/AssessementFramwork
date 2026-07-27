@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!--
+    Inherit the framework's parent POM. This single block gives us:
+      - Spring Boot 4.0.5 dependency + plugin management
+      - Java 21 / UTF-8 build settings
+      - Managed versions for Camunda 8.9.0, PostgreSQL, ArchUnit, etc.
+    <relativePath/> forces Maven to resolve the parent from the local ~/.m2
+    repository, where `mvn install` in the framework repo published it — so this
+    sample does NOT need to live inside the framework repo.
+  -->
+  <parent>
+    <groupId>com.aaseya.camunda</groupId>
+    <artifactId>camunda-process-framework</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath/>
+  </parent>
+
+  <!-- This service has its own coordinate, independent of the framework's groupId. -->
+  <groupId>com.aaseya.orders</groupId>
+  <artifactId>order-service-sample</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+
+  <name>order-service-sample</name>
+  <description>
+    Worked example of a service built on camunda-process-framework. One BPMN process
+    (order-fulfillment) wired end-to-end through every architectural layer, to show
+    where a real project's files and folders go. Not part of the framework build.
+  </description>
+
+  <dependencies>
+
+    <!-- ================= Spring Boot baseline (versions from parent BOM) ================= -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-jpa</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-validation</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+
+    <!-- ================= Framework starters (our version, 0.1.0-SNAPSHOT) ================= -->
+    <!-- Auto-configures ProcessService, VariableMapper, IdempotencyGuard, OutboxRelay,
+         and the Jackson 2.x ObjectMapper. Transitively brings framework-core. -->
+    <dependency>
+      <groupId>com.aaseya.camunda</groupId>
+      <artifactId>framework-camunda-starter</artifactId>
+      <version>0.1.0-SNAPSHOT</version>
+    </dependency>
+    <!-- Response<T> envelope + RFC-7807 GlobalExceptionHandler. -->
+    <dependency>
+      <groupId>com.aaseya.camunda</groupId>
+      <artifactId>framework-web-starter</artifactId>
+      <version>0.1.0-SNAPSHOT</version>
+    </dependency>
+    <!-- AuditColumnListener, Flyway naming validator, JPA conventions (ddl-auto=validate). -->
+    <dependency>
+      <groupId>com.aaseya.camunda</groupId>
+      <artifactId>framework-data-starter</artifactId>
+      <version>0.1.0-SNAPSHOT</version>
+    </dependency>
+    <!-- Micrometer/Prometheus, MDC correlation filter, framework counters. -->
+    <dependency>
+      <groupId>com.aaseya.camunda</groupId>
+      <artifactId>framework-observability-starter</artifactId>
+      <version>0.1.0-SNAPSHOT</version>
+    </dependency>
+    <!-- Explicit (also arrives transitively) — BaseWorker, WorkResult, AuditableEntity, exceptions. -->
+    <dependency>
+      <groupId>com.aaseya.camunda</groupId>
+      <artifactId>framework-core</artifactId>
+      <version>0.1.0-SNAPSHOT</version>
+    </dependency>
+
+    <!-- ================= Database drivers + Flyway ================= -->
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <!-- H2 is runtime (not test): the `local` profile points the datasource at H2, so the
+         driver must be on the runtime classpath and in the fat jar. -->
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <!-- Boot 4 splits Flyway auto-config into its own module; without this, migrations
+         are silently skipped. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-flyway</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-database-postgresql</artifactId>
+    </dependency>
+
+    <!-- ================= Test ================= -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- Framework test-support: brings the six reusable ArchUnit ArchRule constants. -->
+    <dependency>
+      <groupId>com.aaseya.camunda</groupId>
+      <artifactId>framework-test</artifactId>
+      <version>0.1.0-SNAPSHOT</version>
+      <scope>test</scope>
+    </dependency>
+    <!-- ArchUnit JUnit 5 runner (@AnalyzeClasses / @ArchTest); version from parent. -->
+    <dependency>
+      <groupId>com.tngtech.archunit</groupId>
+      <artifactId>archunit-junit5</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+        <configuration>
+          <mainClass>com.aaseya.orders.OrderServiceApplication</mainClass>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+
+</project>

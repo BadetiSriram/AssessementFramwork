@@ -1,0 +1,40 @@
+spring:
+  application:
+    name: service-template
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/service_template}
+    username: ${DB_USER:service_template}
+    password: ${DB_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+
+server:
+  port: 8080
+
+camunda:
+  client:
+    mode: saas
+    auth:
+      client-id: ${CAMUNDA_CLIENT_ID:}
+      client-secret: ${CAMUNDA_CLIENT_SECRET:}
+    cloud:
+      cluster-id: ${CAMUNDA_CLUSTER_ID:}
+      region: ${CAMUNDA_REGION:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+framework:
+  camunda:
+    multi-tenant: false

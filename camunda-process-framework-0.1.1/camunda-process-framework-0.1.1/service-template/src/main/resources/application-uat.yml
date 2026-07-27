@@ -1,0 +1,15 @@
+# UAT profile: informational logging, curated actuator endpoints, no SQL echo.
+logging:
+  level:
+    root: INFO
+    com.aaseya: INFO
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+
+spring:
+  jpa:
+    show-sql: false

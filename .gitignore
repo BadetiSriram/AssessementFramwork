@@ -1,0 +1,22 @@
+# --- Secrets: never commit real local config (copy from *.example instead) ---
+**/application-local.yml
+**/application-localpg.yml
+.env
+*.env
+!*.env.example
+
+# --- Build output ---
+target/
+**/target/
+*.class
+*.jar
+!**/*-sources.jar
+
+# --- Local tooling / IDE / OS junk ---
+.claude/
+.idea/
+*.iml
+.vscode/
+*.stackdump
+.DS_Store
+Thumbs.db

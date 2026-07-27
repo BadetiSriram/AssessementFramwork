@@ -1,0 +1,337 @@
+# =============================================================================
+# camunda-process-framework — GitLab CI Reference Pipeline
+# =============================================================================
+#
+# OPERATOR SETUP CHECKLIST
+# The following CI/CD variables MUST be configured in GitLab
+# (Settings > CI/CD > Variables) before this pipeline can run end-to-end.
+#
+# Variable              Scope           Description
+# ---------------------+---------------+---------------------------------------
+# SONAR_HOST_URL        All             Base URL of your SonarQube instance
+#                                       e.g. https://sonar.example.com
+# SONAR_TOKEN           All (masked)    SonarQube authentication token
+# CI_REGISTRY           GitLab-managed  Auto-provided; registry FQDN
+# CI_REGISTRY_IMAGE     GitLab-managed  Auto-provided; full image path prefix
+# CI_REGISTRY_USER      GitLab-managed  Auto-provided; registry login username
+# CI_REGISTRY_PASSWORD  GitLab-managed  Auto-provided; registry login password
+# KUBE_NAMESPACE        dev env only    Kubernetes namespace for dev deploys
+# KUBE_CONFIG           dev env only    base64-encoded kubeconfig (or use the
+#                                       GitLab Kubernetes Agent integration)
+#
+# FOLLOW-UP (out of scope for this file):
+#   - Create sonar-project.properties in the repo root to configure project key,
+#     source paths, exclusions, and coverage report paths for the SonarQube scan.
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Global tool-version pins
+# ---------------------------------------------------------------------------
+variables:
+  MAVEN_IMAGE: "maven:3.9-eclipse-temurin-21"
+  TRIVY_IMAGE: "aquasec/trivy:latest"
+  HELM_IMAGE: "alpine/helm:3.14.4"
+
+  MAVEN_OPTS: >-
+    -Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository
+    -Dstyle.color=always
+    -Dorg.slf4j.simpleLogger.showDateTime=true
+    -Djava.awt.headless=true
+
+  MAVEN_CLI_OPTS: "--batch-mode --errors --fail-at-end --show-version"
+
+  # Convenience: the image name used across image / image-scan jobs
+  IMAGE_TAG: "$CI_REGISTRY_IMAGE/service-template:$CI_COMMIT_SHORT_SHA"
+
+# ---------------------------------------------------------------------------
+# Stage ordering
+# ---------------------------------------------------------------------------
+stages:
+  - build
+  - test
+  - quality-gate
+  - sonar
+  - image
+  - image-scan
+  - helm-lint
+  - deploy-dev
+  - smoke
+
+# ---------------------------------------------------------------------------
+# Shared configuration via extends
+# ---------------------------------------------------------------------------
+
+# Base for every Maven job
+.maven-job:
+  image: $MAVEN_IMAGE
+  cache:
+    key:
+      files:
+        - pom.xml
+    paths:
+      - .m2/repository/
+    policy: pull-push
+
+# Base rules: MR pipelines + pushes to main
+.rules-standard:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# Base rules: main branch and version-tag pushes only
+.rules-release:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+.*/'
+
+# =============================================================================
+# Stage 1: build
+# =============================================================================
+
+compile:
+  extends:
+    - .maven-job
+    - .rules-standard
+  stage: build
+  script:
+    - mvn $MAVEN_CLI_OPTS compile
+  artifacts:
+    name: "jars-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - "**/target/*.jar"
+    expire_in: 1 week
+
+# =============================================================================
+# Stage 2: test
+# =============================================================================
+
+unit-test:
+  extends:
+    - .maven-job
+    - .rules-standard
+  stage: test
+  script:
+    # mvn verify runs: compile -> test -> package -> integration-test -> verify
+    # This covers unit tests, ArchUnit checks, and camunda-process-test scenarios
+    # in a single reactor invocation without performing mvn install.
+    - mvn $MAVEN_CLI_OPTS verify -pl framework-core,framework-camunda-starter,framework-security-starter,framework-observability-starter,framework-data-starter,framework-test,service-template -am
+  artifacts:
+    name: "test-results-$CI_COMMIT_SHORT_SHA"
+    when: always
+    paths:
+      - "**/target/surefire-reports/TEST-*.xml"
+      - "**/target/site/jacoco/jacoco.xml"
+    reports:
+      junit:
+        - "**/target/surefire-reports/TEST-*.xml"
+      coverage_report:
+        coverage_format: jacoco
+        path: "**/target/site/jacoco/jacoco.xml"
+    expire_in: 1 week
+
+# =============================================================================
+# Stage 3: quality-gate
+# =============================================================================
+
+# Coverage floor check using the JaCoCo Maven plugin.
+# The plugin is configured in pom.xml with two rules:
+#   1. Overall line-coverage >= 80%
+#   2. framework-core domain packages line-coverage >= 90%
+# If those thresholds are violated, the build fails here (not silently later).
+coverage-gate:
+  extends:
+    - .maven-job
+    - .rules-standard
+  stage: quality-gate
+  script:
+    - mvn $MAVEN_CLI_OPTS verify -pl framework-core,framework-camunda-starter,framework-security-starter,framework-observability-starter,framework-data-starter,framework-test,service-template -am -Djacoco.skip=false -Dmaven.test.skip=true
+  needs:
+    - job: unit-test
+      artifacts: true
+
+bpmn-integrity:
+  extends: .rules-standard
+  stage: quality-gate
+  image: $MAVEN_IMAGE
+  script:
+    - chmod +x tools/check-bpmn-integrity.sh
+    - tools/check-bpmn-integrity.sh
+  needs:
+    - job: compile
+      artifacts: false
+
+# =============================================================================
+# Stage 4: sonar
+# =============================================================================
+
+sonar-scan:
+  extends:
+    - .maven-job
+    - .rules-standard
+  stage: sonar
+  variables:
+    # Sonar quality gate: 0 blockers, 0 critical vulnerabilities, duplication < 3%
+    # These thresholds are enforced on the SonarQube server Quality Gate definition,
+    # not as CLI flags. The pipeline waits for the gate result via sonar.qualitygate.wait.
+    SONAR_QUALITYGATE_WAIT: "true"
+  script:
+    - mvn $MAVEN_CLI_OPTS verify sonar:sonar
+      -Dsonar.host.url=$SONAR_HOST_URL
+      -Dsonar.token=$SONAR_TOKEN
+      -Dsonar.qualitygate.wait=$SONAR_QUALITYGATE_WAIT
+      -Dmaven.test.skip=true
+  needs:
+    - job: unit-test
+      artifacts: true
+
+# =============================================================================
+# Stage 5: image
+# =============================================================================
+
+docker-build:
+  extends: .rules-release
+  stage: image
+  image: docker:24-cli
+  services:
+    - docker:24-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+    DOCKER_BUILDKIT: "1"
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    # Build with BuildKit enabled (DOCKER_BUILDKIT=1 set above)
+    - docker build
+      -f service-template/Dockerfile
+      -t $IMAGE_TAG
+      --cache-from $CI_REGISTRY_IMAGE/service-template:latest
+      --build-arg BUILDKIT_INLINE_CACHE=1
+      .
+    - docker push $IMAGE_TAG
+    # On tag pushes, also push a human-readable tag derived from the git tag
+    - |
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        docker tag $IMAGE_TAG $CI_REGISTRY_IMAGE/service-template:$CI_COMMIT_TAG
+        docker push $CI_REGISTRY_IMAGE/service-template:$CI_COMMIT_TAG
+      fi
+  needs:
+    - job: sonar-scan
+      artifacts: false
+
+# =============================================================================
+# Stage 6: image-scan
+# =============================================================================
+
+trivy-scan:
+  extends: .rules-release
+  stage: image-scan
+  image: $TRIVY_IMAGE
+  variables:
+    # --ignore-unfixed skips vulnerabilities with no available fix.
+    # Some teams prefer to remove this flag and fail on unfixed CVEs as well,
+    # to enforce a zero-tolerance posture regardless of upstream fix availability.
+    TRIVY_NO_PROGRESS: "true"
+  before_script:
+    - trivy image --download-db-only
+  script:
+    - trivy image
+      --exit-code 1
+      --severity HIGH,CRITICAL
+      --ignore-unfixed
+      --no-progress
+      $IMAGE_TAG
+  needs:
+    - job: docker-build
+      artifacts: false
+
+# =============================================================================
+# Stage 7: helm-lint
+# =============================================================================
+
+helm-lint:
+  extends: .rules-standard
+  stage: helm-lint
+  image: $HELM_IMAGE
+  script:
+    - helm lint deploy/helm-chart
+    # kubeval validates rendered manifests against Kubernetes JSON schemas.
+    # It is not bundled in alpine/helm; install if available or skip gracefully.
+    - |
+      if command -v kubeval >/dev/null 2>&1; then
+        helm template service-template deploy/helm-chart \
+          -f deploy/helm-chart/values-service-template.yaml \
+          --set image.tag=$CI_COMMIT_SHORT_SHA \
+          | kubeval --strict
+      else
+        echo "kubeval not found in image $HELM_IMAGE; skipping schema validation."
+        echo "To enable kubeval, extend this image or add a before_script install step."
+      fi
+  needs: []
+
+# =============================================================================
+# Stage 8: deploy-dev
+# =============================================================================
+
+deploy-dev:
+  extends: .rules-release
+  stage: deploy-dev
+  image: $HELM_IMAGE
+  environment:
+    name: dev
+    url: http://service-template.dev.example.com
+  when: manual
+  variables:
+    # KUBE_NAMESPACE and KUBE_CONFIG must be set as masked CI/CD variables
+    # scoped to the dev environment in GitLab Settings > CI/CD > Variables.
+    HELM_RELEASE_NAME: "service-template"
+  before_script:
+    - mkdir -p ~/.kube
+    - echo "$KUBE_CONFIG" | base64 -d > ~/.kube/config
+    - chmod 600 ~/.kube/config
+  script:
+    - helm upgrade --install $HELM_RELEASE_NAME deploy/helm-chart
+      -f deploy/helm-chart/values-service-template.yaml
+      --set image.tag=$CI_COMMIT_SHORT_SHA
+      --namespace $KUBE_NAMESPACE
+      --create-namespace
+      --wait
+      --timeout 5m
+  needs:
+    - job: trivy-scan
+      artifacts: false
+
+# =============================================================================
+# Stage 9: smoke (optional — runs after deploy-dev)
+# =============================================================================
+
+smoke-dev:
+  extends: .rules-release
+  stage: smoke
+  image: alpine:3.19
+  environment:
+    name: dev
+  when: on_success
+  before_script:
+    - apk add --no-cache curl
+  script:
+    # Replace SERVICE_TEMPLATE_URL with the appropriate CI/CD variable or
+    # derive it from the Kubernetes service/ingress address.
+    # The health endpoint is the Spring Boot Actuator default.
+    - |
+      HEALTH_URL="${SERVICE_TEMPLATE_URL:-http://service-template.$KUBE_NAMESPACE.svc.cluster.local}/actuator/health"
+      MAX_RETRIES=10
+      RETRY_DELAY=10
+      i=0
+      until curl --silent --fail "$HEALTH_URL" | grep -q '"status":"UP"'; do
+        i=$((i + 1))
+        if [ "$i" -ge "$MAX_RETRIES" ]; then
+          echo "Service did not report UP after $MAX_RETRIES attempts."
+          exit 1
+        fi
+        echo "Attempt $i/$MAX_RETRIES: service not yet UP. Retrying in ${RETRY_DELAY}s..."
+        sleep $RETRY_DELAY
+      done
+      echo "Smoke check passed: /actuator/health reports UP."
+  needs:
+    - job: deploy-dev
+      artifacts: false

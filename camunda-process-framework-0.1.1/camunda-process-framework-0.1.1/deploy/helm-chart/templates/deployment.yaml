@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "camunda-service.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "camunda-service.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "camunda-service.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "camunda-service.selectorLabels" . | nindent 8 }}
+      {{- if .Values.configMap.data }}
+      annotations:
+        # Force pod restart when ConfigMap content changes (checksum trigger).
+        checksum/config: {{ toJson .Values.configMap.data | sha256sum }}
+      {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "camunda-service.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      containers:
+        - name: {{ include "camunda-service.name" . }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          # Lifecycle: preStop sleep keeps the pod in rotation long enough for
+          # the load balancer to drain connections before SIGTERM is sent.
+          {{- if .Values.preStop.enabled }}
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sh", "-c", "sleep {{ .Values.preStop.sleepSeconds }}"]
+          {{- end }}
+          # Startup probe gates liveness/readiness probes until the application
+          # has had sufficient time to start. Prevents premature OOMKill loops.
+          startupProbe:
+            httpGet:
+              path: {{ .Values.probes.startup.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.probes.startup.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.startup.periodSeconds }}
+            failureThreshold: {{ .Values.probes.startup.failureThreshold }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.probes.liveness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.probes.readiness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          # Secrets injected via envFrom (external-secrets / Kubernetes Secrets).
+          # Keeps credentials out of the Deployment spec and values files.
+          {{- if or .Values.envFrom .Values.configMap.data }}
+          envFrom:
+            {{- range .Values.envFrom }}
+            - {{- toYaml . | nindent 14 }}
+            {{- end }}
+            {{- if .Values.configMap.data }}
+            - configMapRef:
+                name: {{ include "camunda-service.fullname" . }}-config
+            {{- end }}
+          {{- end }}
+          # Individual environment variables (literal or valueFrom).
+          {{- if .Values.env }}
+          env:
+            {{- toYaml .Values.env | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            # /tmp must be writable; readOnlyRootFilesystem=true is enforced,
+            # so we back /tmp with an emptyDir volume for JVM temp files.
+            - name: tmp-dir
+              mountPath: /tmp
+      volumes:
+        - name: tmp-dir
+          emptyDir: {}

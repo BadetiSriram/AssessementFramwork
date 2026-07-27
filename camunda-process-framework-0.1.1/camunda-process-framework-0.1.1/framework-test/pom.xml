@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aaseya.camunda</groupId>
+    <artifactId>camunda-process-framework</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>framework-test</artifactId>
+  <packaging>jar</packaging>
+
+  <name>framework-test</name>
+  <description>
+    Shared testing utilities and architecture rules for all framework consumers.
+    Provides ArchUnit rule sets, Camunda process-test fixtures, and in-memory
+    infrastructure stubs so service modules achieve consistent test coverage
+    without duplicating harness code.
+  </description>
+
+  <dependencies>
+
+    <!-- Framework core — exposes domain types verified by ArchUnit rules. -->
+    <dependency>
+      <groupId>com.aaseya.camunda</groupId>
+      <artifactId>framework-core</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <!-- ArchUnit JUnit 5 — architecture rule assertions. Version managed in parent. -->
+    <dependency>
+      <groupId>com.tngtech.archunit</groupId>
+      <artifactId>archunit-junit5</artifactId>
+    </dependency>
+
+    <!-- Camunda process test harness — in-process Zeebe engine for scenario tests.
+         The parent dependencyManagement defaults this to 'test' scope; we override to
+         'compile' here because framework-test IS the test-support library and must
+         re-export this harness to consumers who import us at test scope. -->
+    <dependency>
+      <groupId>io.camunda</groupId>
+      <artifactId>camunda-process-test-spring</artifactId>
+      <scope>compile</scope>
+    </dependency>
+
+    <!-- Spring Boot test infrastructure — ApplicationContext loading, MockMvc, etc.
+         Overridden from the Spring Boot parent default of 'test' to 'compile' so that
+         consumers of this test-support library can use the harness classes without
+         needing to declare these dependencies themselves. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>compile</scope>
+    </dependency>
+
+    <!-- H2 in-memory database — lightweight persistence for repository unit tests.
+         compile scope so consumers can use JdbcTemplateTestFactory without adding H2
+         themselves. -->
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>compile</scope>
+    </dependency>
+
+    <!-- Spring JDBC — JdbcTemplate access in test fixtures and helper methods. -->
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-jdbc</artifactId>
+    </dependency>
+
+    <!-- Spring Web annotations (test scope) — inner Good/Bad pojos in ArchitectureRulesTest
+         need @RestController and @Transactional to exercise the rule shapes. Not exposed to
+         consumers. -->
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-web</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+  </dependencies>
+
+</project>

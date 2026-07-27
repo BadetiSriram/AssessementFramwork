@@ -1,0 +1,46 @@
+{{- if .Values.networkPolicy.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "camunda-service.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "camunda-service.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "camunda-service.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    # Allow traffic from pods within the same namespace (e.g. internal API calls).
+    - from:
+        - podSelector: {}
+    # Allow Prometheus scraping from the monitoring namespace.
+    # The monitoring namespace must carry the label: kubernetes.io/metadata.name=monitoring
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+
+  egress:
+    # Allow DNS resolution via kube-dns (both UDP and TCP on port 53).
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # Allow outbound traffic on the ports declared in values.networkPolicy.egressPorts.
+    # Typical entries: 5432/TCP (PostgreSQL) and 443/TCP (Camunda SaaS / IdP HTTPS).
+    {{- range .Values.networkPolicy.egressPorts }}
+    - ports:
+        - port: {{ .port }}
+          protocol: {{ .protocol }}
+    {{- end }}
+{{- end }}

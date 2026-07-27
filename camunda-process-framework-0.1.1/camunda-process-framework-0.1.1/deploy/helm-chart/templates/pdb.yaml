@@ -1,0 +1,14 @@
+{{- if .Values.pdb.enabled -}}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "camunda-service.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "camunda-service.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "camunda-service.selectorLabels" . | nindent 6 }}
+{{- end }}

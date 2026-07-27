@@ -1,0 +1,28 @@
+# Copy this file to `application-local.yml` and fill in real values.
+# `application-local.yml` is git-ignored so secrets never get committed.
+#
+# Run with:  mvn spring-boot:run "-Dspring-boot.run.profiles=local"
+#
+# Local run against PostgreSQL 17 (localhost:5432/order_service).
+# The database 'order_service' and role 'order_service' must already exist
+# (Flyway creates only the tables, not the database/role). See ../../CLAUDE.md.
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/order_service
+    username: order_service
+    password: order_service      # local dev role password — change for your machine
+  jpa:
+    hibernate:
+      ddl-auto: validate         # Flyway owns the schema; Hibernate only validates it
+
+# Camunda 8.9 SaaS cluster credentials — GET THESE FROM YOUR CAMUNDA CONSOLE.
+# Never commit real values.
+camunda:
+  client:
+    mode: saas
+    cloud:
+      cluster-id: <YOUR_CLUSTER_ID>
+      region: <YOUR_REGION>          # e.g. sin-1
+    auth:
+      client-id: <YOUR_CLIENT_ID>
+      client-secret: <YOUR_CLIENT_SECRET>
