@@ -65,11 +65,20 @@ completed in **Tasklist**. Swagger: `http://localhost:8080/swagger-ui/index.html
 - **Timers & escalation (UC4 core):** severity-based **SLA timer** on CISO Review (non-interrupting,
   duration `=slaDuration` derived from severity) → escalate; **72-hour** regulatory-deadline timer
   (non-interrupting) on the Legal notification task → escalate to CISO.
+- **Tasklist forms** (`src/main/resources/forms/*.form`) for every human task, linked via
+  `zeebe:formDefinition` and deployed with the process — containment verification, forensic
+  analysis, CISO review, integrity verification, regulatory notification, isolation-failure
+  handling, and closure.
+- **BPMN DI** (diagram layout) generated with Camunda's `bpmn-auto-layout`, so Operate renders the
+  diagram.
 - Postgres; Swagger; ArchUnit (6/6 pass). Raising an incident runs triage → DMN P1 → classified →
-  all four parallel branches (incl. ad-hoc) with no incidents, then waits at the human tasks.
+  all four parallel branches (incl. ad-hoc) with no incidents, then waits at the human tasks (which
+  now show forms in Tasklist).
 
 **Next iterations (best done in Web Modeler):**
 - Replace the Triage and Post-Incident-Report workers with **AI connector** tasks.
 - Wrap Containment / Forensics / Recovery in **embedded sub-processes**.
-- Add BPMN **DI** (diagram layout) so Operate renders it and it's presentable for the demo.
-- Tune SLA/timer durations and add Tasklist **forms** for each human task.
+- Tune SLA/timer durations and enrich the form fields.
+
+> Regenerate DI after editing the BPMN: `npx bpmn-auto-layout` via a small script (see the
+> `layout.mjs` used during setup), or just re-open in Web Modeler.

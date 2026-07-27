@@ -1,0 +1,25 @@
+{
+  "type": "default",
+  "id": "handle-isolation-failure-form",
+  "schemaVersion": 18,
+  "components": [
+    {
+      "type": "text",
+      "id": "hif_intro",
+      "text": "## Handle Isolation Failure\nAutomated isolation failed. Decide and record the manual containment action."
+    },
+    {
+      "type": "checkbox",
+      "id": "hif_contained",
+      "key": "manuallyContained",
+      "label": "Systems manually contained"
+    },
+    {
+      "type": "textarea",
+      "id": "hif_action",
+      "key": "isolationFailureAction",
+      "label": "Action taken",
+      "validate": { "required": true }
+    }
+  ]
+}

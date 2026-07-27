@@ -13,7 +13,8 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @Deployment(resources = {
         "classpath*:processes/*.bpmn",
-        "classpath*:dmn/*.dmn"
+        "classpath*:dmn/*.dmn",
+        "classpath*:forms/*.form"
 })
 public class CamundaDeploymentConfig {
 }
