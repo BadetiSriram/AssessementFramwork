@@ -48,7 +48,9 @@ public class TriageWorker extends BaseWorker<IncidentJobVars> {
                         + ": enrichment + IOC lookup + attack-pattern match (placeholder).",
                 "attackConfirmed", true,
                 "assetCriticality", "HIGH",
-                "dataExposed", true));
+                "dataExposed", true,
+                // Feeds the Regulatory Notification Required DMN.
+                "recordCount", 25000));
     }
 
     @JobWorker(type = "triage-threat", autoComplete = false)

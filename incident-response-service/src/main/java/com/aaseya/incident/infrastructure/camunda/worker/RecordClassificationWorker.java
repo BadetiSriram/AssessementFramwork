@@ -11,6 +11,8 @@ import io.camunda.client.api.worker.JobClient;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
+
 /**
  * Records the DMN classification result on the incident aggregate (type
  * {@code record-classification}). Runs immediately after the Incident Classification DMN business
@@ -35,7 +37,14 @@ public class RecordClassificationWorker extends BaseWorker<ClassificationVars> {
     @Override
     protected WorkResult doWork(ClassificationVars vars, ActivatedJob job) {
         incidentService.recordClassification(vars.incidentId(), vars.severity());
-        return WorkResult.completed();
+        // Severity drives the SLA (ISO-8601 duration) used by the human-task SLA timers.
+        String slaDuration = switch (vars.severity()) {
+            case "P1" -> "PT4H";
+            case "P2" -> "PT8H";
+            case "P3" -> "PT24H";
+            default   -> "PT72H";
+        };
+        return WorkResult.completed(Map.of("slaDuration", slaDuration));
     }
 
     @JobWorker(type = "record-classification", autoComplete = false)

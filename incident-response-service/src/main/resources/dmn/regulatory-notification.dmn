@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
+             id="regulatory-decisions"
+             name="Regulatory Decisions"
+             namespace="http://camunda.org/schema/1.0/dmn">
+  <!--
+    Regulatory Notification Required — decides whether Legal must file regulatory/customer
+    notifications, based on whether data was exposed and how many records were affected.
+    (A production table would also consider data categories and jurisdictions.)
+    Business rule task stores the boolean result in `regulatoryRequired`. Hit policy FIRST.
+  -->
+  <decision id="regulatory-notification" name="Regulatory Notification Required">
+    <decisionTable id="regulatory-notification-table" hitPolicy="FIRST">
+      <input id="input_dataExposed" label="Data Exposed">
+        <inputExpression id="inputExpr_dataExposed" typeRef="boolean">
+          <text>dataExposed</text>
+        </inputExpression>
+      </input>
+      <input id="input_recordCount" label="Records Affected">
+        <inputExpression id="inputExpr_recordCount" typeRef="number">
+          <text>recordCount</text>
+        </inputExpression>
+      </input>
+      <output id="output_required" label="Regulatory Required" name="regulatoryRequired" typeRef="boolean"/>
+
+      <rule id="rule_no_data">
+        <inputEntry id="ie_nd_1"><text>false</text></inputEntry>
+        <inputEntry id="ie_nd_2"><text></text></inputEntry>
+        <outputEntry id="oe_nd"><text>false</text></outputEntry>
+      </rule>
+      <rule id="rule_threshold">
+        <inputEntry id="ie_th_1"><text>true</text></inputEntry>
+        <inputEntry id="ie_th_2"><text>&gt;= 500</text></inputEntry>
+        <outputEntry id="oe_th"><text>true</text></outputEntry>
+      </rule>
+      <rule id="rule_default">
+        <inputEntry id="ie_df_1"><text></text></inputEntry>
+        <inputEntry id="ie_df_2"><text></text></inputEntry>
+        <outputEntry id="oe_df"><text>false</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

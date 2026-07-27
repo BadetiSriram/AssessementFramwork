@@ -53,20 +53,23 @@ curl -X POST http://localhost:8080/incidents -H "Content-Type: application/json"
 Human tasks (Containment Verification, Forensic Analysis, CISO Review, closure, ...) are then
 completed in **Tasklist**. Swagger: `http://localhost:8080/swagger-ui/index.html`.
 
-## Status (as of the first build)
-**Implemented & verified end-to-end:** project scaffold on the framework; incident domain +
-state machine; all 12 idempotent job workers; Incident Classification **DMN** (deployed, invoked
-via a business rule task); the `incident-response` **BPMN** (parallel containment/forensics/
-notification, isolation-failure BPMN-error escalation, P4 auto-close, native user tasks with
-candidate groups per persona); Postgres; Swagger; ArchUnit (6/6 pass). Raising an incident runs the
-automated chain through DMN classification to the human tasks.
+## Status
+**Implemented & verified end-to-end:**
+- Project scaffold on the framework; incident domain + state machine; **13** idempotent job workers.
+- **Two DMN tables** — Incident Classification (P1–P4) and Regulatory Notification Required — both
+  deployed and invoked via business rule tasks (`zeebe:calledDecision`).
+- The `incident-response` **BPMN**: parallel containment/forensics/notification, **ad-hoc
+  response-actions sub-process** (commander activates block-ip / revoke-credentials / deploy-patch
+  at runtime via `activeElementsCollection`), isolation-failure **BPMN-error escalation** to the
+  commander, **P4 auto-close**, native user tasks with candidate groups per persona.
+- **Timers & escalation (UC4 core):** severity-based **SLA timer** on CISO Review (non-interrupting,
+  duration `=slaDuration` derived from severity) → escalate; **72-hour** regulatory-deadline timer
+  (non-interrupting) on the Legal notification task → escalate to CISO.
+- Postgres; Swagger; ArchUnit (6/6 pass). Raising an incident runs triage → DMN P1 → classified →
+  all four parallel branches (incl. ad-hoc) with no incidents, then waits at the human tasks.
 
 **Next iterations (best done in Web Modeler):**
 - Replace the Triage and Post-Incident-Report workers with **AI connector** tasks.
-- Add the **ad-hoc response-actions** sub-process (block-ip / revoke-credentials / deploy-patch —
-  workers already exist).
-- Add **timers & escalation** (72h regulatory deadline → CISO; severity-based SLA timers on human
-  tasks) — UC4's core capability.
-- Add the **Regulatory Notification Required** DMN + Legal notification path.
-- Wrap Containment / Forensics / Recovery in **embedded sub-processes**; add BPMN **DI** (diagram
-  layout) so Operate renders it and it's presentable.
+- Wrap Containment / Forensics / Recovery in **embedded sub-processes**.
+- Add BPMN **DI** (diagram layout) so Operate renders it and it's presentable for the demo.
+- Tune SLA/timer durations and add Tasklist **forms** for each human task.

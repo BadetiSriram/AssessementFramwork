@@ -9,6 +9,7 @@ import com.aaseya.incident.repository.IncidentRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -52,7 +53,12 @@ public class IncidentService {
                         "incidentId", incident.getId().toString(),
                         "title", incident.getTitle(),
                         "source", incident.getSource(),
-                        "forceIsolationFailure", forceIsolationFailure)));
+                        "forceIsolationFailure", forceIsolationFailure,
+                        // Ad-hoc response actions the incident commander activates. Defaulted so
+                        // the flow runs end-to-end; at runtime the commander selects these via the
+                        // ad-hoc sub-process API as findings emerge (block-ip / revoke-credentials
+                        // / deploy-patch — inner element IDs of the ad-hoc sub-process).
+                        "responseActions", List.of("Task_BlockIp", "Task_RevokeCredentials"))));
 
         return incident;
     }
