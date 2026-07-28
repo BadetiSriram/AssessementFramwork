@@ -6,19 +6,28 @@
     <bpmn:startEvent id="StartEvent_1" name="SIEM alert">
       <bpmn:outgoing>Flow_start_triageai</bpmn:outgoing>
     </bpmn:startEvent>
-    <bpmn:serviceTask id="Task_TriageAI" name="AI Threat Triage">
+    <bpmn:serviceTask id="Task_TriageAI" name="AI Threat Triage" zeebe:modelerTemplate="Template_0oit8ac" zeebe:modelerTemplateVersion="1">
       <bpmn:extensionElements>
-        <zeebe:taskDefinition type="io.camunda:http-json:1" retries="2" />
+        <zeebe:taskDefinition type="io.camunda.agenticai:aiagent:1" retries="3" />
         <zeebe:ioMapping>
-          <zeebe:input source="POST" target="method" />
-          <zeebe:input source="https://api.openai.com/v1/chat/completions" target="url" />
-          <zeebe:input source="={&#34;Content-Type&#34;: &#34;application/json&#34;, &#34;Authorization&#34;: &#34;Bearer {{secrets.OPENAI_API_TOKEN}}&#34;}" target="headers" />
-          <zeebe:input source="={model: &#34;gpt-4o-mini&#34;, messages: [{role: &#34;system&#34;, content: &#34;You are a SOC threat-triage assistant. Summarize the alert in 3-4 sentences: enrichment, likely IOCs, and attack-pattern match.&#34;}, {role: &#34;user&#34;, content: &#34;Alert title: &#34; + title + &#34;. Source: &#34; + source}]}" target="body" />
-          <zeebe:input source="30" target="readTimeoutInSeconds" />
+          <zeebe:input source="openai" target="provider.type" />
+          <zeebe:input source="{{secrets.OPENAI_API_TOKEN}}" target="provider.openai.authentication.apiKey" />
+          <zeebe:input source="gpt-4o-mini" target="provider.openai.model.model" />
+          <zeebe:input source="=&#34;You are a SOC threat-triage assistant. Given a security alert, produce a concise triage summary (3-4 sentences): enrichment, likely IOCs, and attack-pattern match.&#34;" target="data.systemPrompt.prompt" />
+          <zeebe:input source="=&#34;Triage this alert. Title: &#34; + title + &#34;. Source: &#34; + source" target="data.userPrompt.prompt" />
+          <zeebe:input source="=triageAgent.context" target="data.context" />
+          <zeebe:input source="in-process" target="data.memory.storage.type" />
+          <zeebe:input source="20" target="data.memory.contextWindowSize" />
+          <zeebe:input source="5" target="data.limits.maxModelCalls" />
+          <zeebe:input source="text" target="data.response.format.type" />
         </zeebe:ioMapping>
         <zeebe:taskHeaders>
-          <zeebe:header key="resultExpression" value="={triageReport: response.body.choices[1].message.content}" />
+          <zeebe:header key="elementTemplateVersion" value="7" />
+          <zeebe:header key="elementTemplateId" value="io.camunda.connectors.agenticai.aiagent.v1" />
+          <zeebe:header key="resultVariable" value="triageAgent" />
+          <zeebe:header key="resultExpression" value="={triageReport: response.responseText}" />
           <zeebe:header key="errorExpression" value="=if error != null then bpmnError(&#34;AI_STEP_FAILED&#34;, &#34;AI triage step failed&#34;) else null" />
+          <zeebe:header key="retryBackoff" value="PT0S" />
         </zeebe:taskHeaders>
       </bpmn:extensionElements>
       <bpmn:incoming>Flow_start_triageai</bpmn:incoming>
@@ -278,19 +287,28 @@
       <bpmn:incoming>Flow_reg_merge</bpmn:incoming>
       <bpmn:outgoing>Flow_regmerge_reportai</bpmn:outgoing>
     </bpmn:exclusiveGateway>
-    <bpmn:serviceTask id="Task_ReportAI" name="AI Post-Incident Report">
+    <bpmn:serviceTask id="Task_ReportAI" name="AI Post-Incident Report" zeebe:modelerTemplate="Template_0oit8ac" zeebe:modelerTemplateVersion="1">
       <bpmn:extensionElements>
-        <zeebe:taskDefinition type="io.camunda:http-json:1" retries="2" />
+        <zeebe:taskDefinition type="io.camunda.agenticai:aiagent:1" retries="3" />
         <zeebe:ioMapping>
-          <zeebe:input source="POST" target="method" />
-          <zeebe:input source="https://api.openai.com/v1/chat/completions" target="url" />
-          <zeebe:input source="={&#34;Content-Type&#34;: &#34;application/json&#34;, &#34;Authorization&#34;: &#34;Bearer {{secrets.OPENAI_API_TOKEN}}&#34;}" target="headers" />
-          <zeebe:input source="={model: &#34;gpt-4o-mini&#34;, messages: [{role: &#34;system&#34;, content: &#34;You are an incident-response analyst. Write a concise post-incident report: timeline, root cause, impact, and lessons learned.&#34;}, {role: &#34;user&#34;, content: &#34;Incident: &#34; + title + &#34;, severity &#34; + severity + &#34;. Triage: &#34; + triageReport}]}" target="body" />
-          <zeebe:input source="30" target="readTimeoutInSeconds" />
+          <zeebe:input source="openai" target="provider.type" />
+          <zeebe:input source="{{secrets.OPENAI_API_TOKEN}}" target="provider.openai.authentication.apiKey" />
+          <zeebe:input source="gpt-4o-mini" target="provider.openai.model.model" />
+          <zeebe:input source="=&#34;You are an incident-response analyst. Write a concise post-incident report with sections: timeline, root cause, impact, and lessons learned.&#34;" target="data.systemPrompt.prompt" />
+          <zeebe:input source="=&#34;Incident: &#34; + title + &#34;, severity &#34; + severity + &#34;. Triage findings: &#34; + triageReport" target="data.userPrompt.prompt" />
+          <zeebe:input source="=reportAgent.context" target="data.context" />
+          <zeebe:input source="in-process" target="data.memory.storage.type" />
+          <zeebe:input source="20" target="data.memory.contextWindowSize" />
+          <zeebe:input source="5" target="data.limits.maxModelCalls" />
+          <zeebe:input source="text" target="data.response.format.type" />
         </zeebe:ioMapping>
         <zeebe:taskHeaders>
-          <zeebe:header key="resultExpression" value="={postIncidentReport: response.body.choices[1].message.content}" />
+          <zeebe:header key="elementTemplateVersion" value="7" />
+          <zeebe:header key="elementTemplateId" value="io.camunda.connectors.agenticai.aiagent.v1" />
+          <zeebe:header key="resultVariable" value="reportAgent" />
+          <zeebe:header key="resultExpression" value="={postIncidentReport: response.responseText}" />
           <zeebe:header key="errorExpression" value="=if error != null then bpmnError(&#34;AI_STEP_FAILED&#34;, &#34;AI report step failed&#34;) else null" />
+          <zeebe:header key="retryBackoff" value="PT0S" />
         </zeebe:taskHeaders>
       </bpmn:extensionElements>
       <bpmn:incoming>Flow_regmerge_reportai</bpmn:incoming>

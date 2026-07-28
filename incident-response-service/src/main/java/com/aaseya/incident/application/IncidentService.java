@@ -62,7 +62,12 @@ public class IncidentService {
                         // the flow runs end-to-end; at runtime the commander selects these via the
                         // ad-hoc sub-process API as findings emerge (block-ip / revoke-credentials
                         // / deploy-patch — inner element IDs of the ad-hoc sub-process).
-                        "responseActions", List.of("Task_BlockIp", "Task_RevokeCredentials"))));
+                        "responseActions", List.of("Task_BlockIp", "Task_RevokeCredentials"),
+                        // Initialize the AI Agent connector context variables so the tasks' input
+                        // mappings (=triageAgent.context / =reportAgent.context) never reference an
+                        // undefined variable on first activation.
+                        "triageAgent", Map.of(),
+                        "reportAgent", Map.of())));
 
         saved.setProcessInstanceKey(processInstanceKey);
         return saved;
