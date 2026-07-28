@@ -13,11 +13,8 @@ import org.springframework.stereotype.Component;
 import java.util.Map;
 
 /**
- * Post-incident report worker (type {@code generate-report}).
- *
- * <p><b>Assessment note:</b> UC4 specifies this as an <em>AI connector</em> step (post-incident
- * report + lessons learned). This worker is a runnable placeholder producing the same output
- * variable; replace it with a Camunda AI connector task in the final model.
+ * Fallback for the AI post-incident report. Only reached when the AI task's boundary error
+ * fires, so the flow can still reach closure without an LLM. Writes the same variable.
  */
 @Component
 public class PostIncidentReportWorker extends BaseWorker<IncidentJobVars> {
@@ -36,7 +33,7 @@ public class PostIncidentReportWorker extends BaseWorker<IncidentJobVars> {
         return WorkResult.completed(Map.of(
                 "postIncidentReport",
                 "Post-incident report for " + vars.incidentId()
-                        + ": timeline, root cause, impact, and lessons learned (placeholder)."));
+                        + ": timeline, root cause, impact, lessons learned. (AI step unavailable.)"));
     }
 
     @JobWorker(type = "generate-report", autoComplete = false)

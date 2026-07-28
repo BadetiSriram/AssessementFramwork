@@ -12,10 +12,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
-/**
- * Forensics evidence-collection worker (type {@code collect-evidence}) — the automated first step
- * of the Forensics sub-process, before the forensics lead's human analysis task.
- */
+/** Grabs the evidence before the forensics lead starts looking at it. */
 @Component
 public class EvidenceCollectionWorker extends BaseWorker<IncidentJobVars> {
 

@@ -2,10 +2,7 @@ package com.aaseya.incident.web.dto;
 
 import com.aaseya.incident.domain.Incident;
 
-/**
- * Outbound view of an {@link Incident}. A record (not the entity) so it is safe to return from a
- * controller (ArchUnit rule 5).
- */
+/** Read model for {@link Incident}. Never return the entity itself from a controller. */
 public record IncidentDto(
         String id,
         String title,

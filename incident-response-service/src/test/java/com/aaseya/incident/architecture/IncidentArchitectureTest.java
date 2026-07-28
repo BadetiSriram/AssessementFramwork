@@ -6,10 +6,8 @@ import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
 
 /**
- * Wires the framework's six reusable architecture rules against this service's packages —
- * proving the hexagonal layout is correct (workers under {@code infrastructure.camunda} may
- * import {@code io.camunda.client}, nothing else does; controllers are DTO-only and
- * non-transactional; domain is framework-pure; constructor injection everywhere).
+ * Runs the framework's architecture rules over our packages. Mostly here to stop the Camunda
+ * client leaking out of infrastructure.camunda and entities leaking out of controllers.
  */
 @AnalyzeClasses(packages = "com.aaseya.incident")
 class IncidentArchitectureTest {

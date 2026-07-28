@@ -9,11 +9,8 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Record of a completed human (Tasklist) task for an incident — captures the form data submitted
- * by the persona (e.g. containment verification, forensic analysis, CISO review). Persisted to
- * {@code incident_task_outcomes} whenever a user task is completed via the API.
- *
- * <p>Framework-pure (ArchUnit rule 3): no Spring Web / servlet / io.camunda imports.
+ * What a human actually submitted when they completed a task. Written every time a user task
+ * is completed through the API, so we keep an audit trail even after Camunda's history expires.
  */
 @Entity
 @Table(name = "incident_task_outcomes")
@@ -38,7 +35,7 @@ public class IncidentTaskOutcome {
     @Column(name = "completed_by")
     private String completedBy;
 
-    /** JSON of the submitted form variables. */
+    /** The submitted form variables, as JSON. */
     @Column(name = "outcome", columnDefinition = "text")
     private String outcome;
 

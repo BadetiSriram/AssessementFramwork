@@ -17,11 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
 
-/**
- * REST adapter for incidents. Raising an incident starts the {@code incident-response} process;
- * all human tasks are then completed in Camunda Tasklist. DTO-only, non-transactional
- * (ArchUnit rules 4 & 5); constructor injection (rule 6).
- */
+/** Raise and read incidents. Raising one starts the incident-response process. */
 @RestController
 @RequestMapping("/incidents")
 public class IncidentController {

@@ -12,10 +12,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
-/**
- * Ad-hoc response action (type {@code deploy-patch}): deploy an emergency patch. Invoked by the
- * incident commander from the ad-hoc response-actions sub-process.
- */
+/** Ad-hoc action: emergency patch. Not in the default responseActions list. */
 @Component
 public class DeployPatchWorker extends BaseWorker<IncidentJobVars> {
 

@@ -16,15 +16,10 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Human-task API for an incident — list active Tasklist tasks, complete them from the API (the
- * demo can still use Tasklist), and read the recorded outcomes.
+ * Human-task API for an incident.
  *
- * <pre>
- *   GET  /incidents/{id}/tasks                       active user tasks (containment verification, ...)
- *   POST /incidents/{id}/tasks/{userTaskKey}/complete   complete a specific task + record outcome
- *   POST /incidents/{id}/tasks/complete              complete the single active task + record outcome
- *   GET  /incidents/{id}/tasks/outcomes              recorded outcomes (persisted to Postgres)
- * </pre>
+ * <p>The two complete endpoints do the same thing; the one without a key is just less typing
+ * during a demo, and errors out if there isn't exactly one task waiting.
  */
 @RestController
 @RequestMapping("/incidents/{id}/tasks")

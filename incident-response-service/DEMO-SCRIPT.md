@@ -1,144 +1,155 @@
-# Use Case 4 — 30-Minute Walkthrough (Demo Script)
+# 30-minute walkthrough
 
-A presenter's guide for the assessment walkthrough. Read it top-to-bottom; it tells you what to
-show, roughly when, and what to say. The goal is to demo the incident-response flow end-to-end
-**through Tasklist** and be ready for design trade-off questions.
-
----
-
-## Before the clock starts (setup — do this ahead of time)
-Have these open and ready so you don't lose time:
-1. **Backend running** — `mvn spring-boot:run "-Dspring-boot.run.profiles=local"`; confirm the log shows
-   `Successfully applied 3 migrations`, `Deployed Processes / Decisions / Forms`, and the 13 workers
-   registered. PostgreSQL 17 must be up.
-2. **Camunda Console tabs**: **Web Modeler** (the `Incident Response (UC4)` project), **Operate**, and
-   **Tasklist** — all pointing at your 8.9 SaaS cluster.
-3. **The `OPENAI_API_TOKEN` secret** configured in Console (so the AI Agent steps produce real text;
-   otherwise they gracefully fall back to a worker — mention this either way).
-4. **Postman** with the collection imported, or a terminal for the `curl` calls.
-5. A **psql** window on the `incident_response` database (to show persistence at the end).
-6. Log in to Tasklist as a user who is in the candidate groups (`soc-analyst`, `incident-commander`,
-   `forensics-lead`, `ciso`, `legal-compliance`) — or be ready to claim tasks regardless.
+Presenter's notes. Read top to bottom; it says what to show, roughly when, and what to say. The
+aim is to get an incident from SIEM alert to CLOSED through Tasklist, and to have answers ready
+for the trade-off questions.
 
 ---
 
-## Minute-by-minute plan (~30 min)
+## Setup (do this before the clock starts)
 
-### 1. Framing the problem (0:00–0:03)
-Explain the business case in a sentence or two: an enterprise SOC drowns in alerts; genuine incidents
-need a coordinated response across containment, forensics and communications, and regulators impose a
-**72-hour notification deadline**. The goal is one orchestrated journey that **triages with AI**,
-**classifies severity with business rules**, runs **containment and forensics in parallel**, lets the
-**incident commander invoke response actions dynamically**, and **enforces the regulatory decision**
-before closure. Say clearly: *the backend is built on our base microservice framework; nothing was
-scaffolded from scratch.*
+Get all of this open ahead of time so you're not fumbling:
 
-### 2. Architecture in one breath (0:03–0:06)
-Show the repository structure briefly and describe the shape:
-- **Hexagonal layering** enforced by ArchUnit (web → application → infrastructure.camunda), the same
-  rules the framework ships.
-- **13 idempotent Spring Boot job workers** back every automated step; **two DMN tables** make the
-  decisions; **two AI Agent connector steps** do triage and the post-incident report; **seven Tasklist
-  forms** with candidate groups per persona; **PostgreSQL** holds the incident aggregate and the
-  human-task outcomes.
-- Mention the framework value: workers get **idempotency, error classification (business vs
-  technical), metrics and MDC** for free; you only wrote `doWork`.
-
-### 3. The model in Web Modeler (0:06–0:12)
-Open `incident-response.bpmn` and walk the flow left-to-right, naming the Camunda capabilities as you
-go (this is where most of the "modeling quality" marks live):
-- **Start** on a SIEM alert → **AI Threat Triage** (purple AI Agent task) → **Record Triage** worker.
-- **Classify Incident** — a **DMN business rule task** producing `severity` (P1–P4). Point out the
-  **P4 gateway**: false positives are **auto-closed**.
-- The **parallel gateway** fanning into four streams: **Containment** and **Forensics** (each an
-  **embedded sub-process**), **Notification**, and the **ad-hoc sub-process** of response actions the
-  **incident commander** activates at runtime (block IP / revoke credentials / deploy patch).
-- Inside Containment, show the **error boundary** on *Isolate Systems*: a failed isolation raises a
-  **BPMN error** that escalates to the commander rather than retrying forever.
-- After the join: **CISO Review** (with a **severity-based SLA timer**), the **Recovery** sub-process,
-  the **Regulatory Notification** DMN, and — when required — the **File Regulatory Notification** task
-  carrying a **non-interrupting 72-hour timer** that escalates to the CISO.
-- Finally the **AI Post-Incident Report** and **Incident Closure**.
-Call out that the AI tasks and both DMN tasks each have **failure handling** (AI error boundary →
-worker fallback; DMN feeds gateways).
-
-### 4. The decisions (0:12–0:14)
-Open the two DMN tables:
-- **Incident Classification** — inputs `attackConfirmed`, `assetCriticality`, `dataExposed` → `severity`.
-- **Regulatory Notification Required** — inputs `dataExposed`, `recordCount` → boolean.
-Say **why hit policy FIRST**: each decision needs a single deterministic output and the rules are an
-ordered precedence list (false-positive first, then most-severe downward), which is easier to maintain
-than the strict non-overlap that UNIQUE demands.
-
-### 5. Start an incident — the happy path (0:14–0:16)
-Trigger a P1 incident (Postman **"Raise incident (P1)"**, or `POST /incidents`). Immediately switch to
-**Operate** and open the new instance. Narrate what runs automatically:
-- AI triage (or its fallback) → **RAISED → TRIAGED**;
-- the classification DMN → **severity P1**; Record Classification → **CLASSIFIED**;
-- the four parallel branches execute their workers and the instance now **waits at the human tasks**.
-Point at the token positions and the process variables panel (`severity`, `triageReport`, `slaDuration`,
-`attackConfirmed`, etc.).
-
-### 6. Do the work in Tasklist (0:16–0:23)
-This is the graded part — **complete the human tasks in Tasklist, not the API.** Show that each task
-lands with the right **candidate group** and a **form**:
-- **Containment Verification** (SOC Analyst) and **Forensic Analysis** (Forensics Lead) — the two
-  parallel tasks. Fill the forms and complete.
-- Back in Operate, show the parallel join releasing → **CISO Review** (CISO) appears; accept residual
-  risk / authorize recovery.
-- **Integrity Verification** (SOC) inside the Recovery sub-process.
-- **File Regulatory Notification** (Legal/Compliance) — mention the 72-hour timer riding on it.
-- **Incident Closure** (Incident Commander) — complete it; the `close-incident` worker fires and the
-  instance **completes**. Show the incident is now **CLOSED** (Operate shows the finished instance;
-  `GET /incidents/{id}` shows `status = CLOSED`).
-
-### 7. Show an exception path (0:23–0:26)
-Start a second incident with `forceIsolationFailure = true` (Postman **"Raise incident (isolation-
-failure path)"**). In Operate, show automated isolation raising a **BPMN error** caught by the boundary,
-which routes to the **Handle Isolation Failure** task for the **Incident Commander** — i.e. it escalates
-to a human instead of silently retrying. Mention the other two exception paths you modelled: **P4 →
-auto-close**, and the **72-hour timer** escalation on the regulatory task.
-
-### 8. Prove persistence & the backend (0:26–0:28)
-Switch to psql (or the API): show the `incidents` row moving through
-`RAISED → TRIAGED → CLASSIFIED → RECOVERING → CLOSED`, and the **`incident_task_outcomes`** table with a
-row per completed human task (who completed it and the submitted form data). This demonstrates the
-backend isn't a black box — every decision and human action is recorded.
-
-### 9. Close & invite questions (0:28–0:30)
-Recap what was demonstrated against the rubric (below) and open for trade-off questions.
+1. Backend running - `mvn spring-boot:run "-Dspring-boot.run.profiles=local"`. Check the log for
+   3 migrations, the deployments, and 13 workers. Postgres has to be up first.
+2. Console tabs: Web Modeler on the Incident Response project, Operate, and Tasklist, all against
+   the 8.9 SaaS cluster.
+3. `OPENAI_API_TOKEN` set as a cluster secret, so the AI steps return real text. Worth mentioning
+   the fallback either way.
+4. Postman with the collection imported, or a terminal.
+5. A psql window on `incident_response` for the persistence bit at the end.
+6. Tasklist logged in as someone in the candidate groups, or be ready to just claim tasks.
 
 ---
 
-## Design trade-offs — be ready to answer these
-The walkthrough is explicitly scored on explaining trade-offs. Have crisp answers ready:
+## The plan
 
-- **Embedded sub-processes vs call activities?** Embedded — Containment/Forensics/Recovery aren't
-  reused elsewhere, they share the incident's variables, and embedding keeps everything in one
-  deployable, versioned unit. A call activity would add deployment/versioning and variable-mapping
-  overhead for no reuse benefit.
-- **DMN hit policy — why FIRST?** Single deterministic output, rules ordered by precedence; tolerant of
-  overlapping conditions, unlike UNIQUE which is brittle to maintain as rules grow.
-- **AI as a connector, and why the fallback?** The AI steps are **AI Agent Task** connectors (OpenAI);
-  each has retries and an **error boundary that falls back to a job worker**, so an AI outage or a
-  missing key never stalls an incident — resilience over hard dependency.
-- **BPMN error vs incident?** Expected/business deviations (failed isolation) → a **BPMN error** that a
-  human handles; unexpected/technical failures → a **retry then an Operate incident** for an operator.
-  The framework encodes exactly this split.
-- **Idempotency?** Every worker carries `businessKey = incidentId`; the framework's `IdempotencyGuard`
-  makes SIEM re-delivery and job retries safe, and the actions themselves are written to be idempotent.
-- **Ad-hoc sub-process vs gateways?** "Select only the actions needed" is genuine runtime selection by
-  the commander — that's what an ad-hoc sub-process models; a gateway chain would hard-code the choice.
-- **Timers?** A severity-derived SLA timer on CISO Review and a fixed 72-hour timer on regulatory
-  notification, both **non-interrupting** so they escalate in parallel without cancelling the task.
+### 0:00-0:03 Framing
 
-## What to say if the AI step doesn't return live text
-"The AI Agent task calls OpenAI using a cluster secret; if the secret isn't present or the call fails,
-the error boundary routes to the fallback worker so the flow still completes — that's the resilience
-pattern in action." (Then optionally configure the secret and re-run to show real output.)
+A SOC drowns in alerts. The real incidents need containment, forensics and comms happening at once,
+and regulators want to hear about a breach inside 72 hours. So: one orchestrated journey that
+triages with AI, classifies with business rules, runs containment and forensics in parallel, lets
+the commander pick response actions as he goes, and forces the regulatory decision before anyone
+can close the incident.
 
-## Rubric coverage checklist (mention at the close)
-Process modeling + DI · two DMN tables · two AI connector steps · ad-hoc sub-process · idempotent
-Spring Boot workers · error handling (BPMN errors, retries, escalation) · Tasklist forms + candidate
-groups per persona · timers & escalation · testing evidence (happy path to CLOSED + the isolation-
-failure exception).
+Worth saying up front that the backend sits on our base microservice framework - nothing was
+scaffolded from scratch.
+
+### 0:03-0:06 Architecture
+
+Show the repo structure and describe the shape: hexagonal layering with ArchUnit enforcing it, 13
+idempotent job workers behind the automated steps, two DMN tables, two AI Agent steps, seven forms
+with a candidate group each, Postgres for the aggregate and the task outcomes.
+
+The framework point is worth making: workers get idempotency, business-vs-technical error
+classification, metrics and MDC for free. All that was written here is `doWork`.
+
+### 0:06-0:12 The model
+
+Open the BPMN and walk it left to right. Most of the modelling marks live here.
+
+Start on a SIEM alert, AI Threat Triage, Record Triage. Then Classify Incident - a DMN task that
+produces `severity`. Point at the P4 gateway: false positives auto-close and never reach a human.
+
+The parallel gateway fans into four: Containment and Forensics as embedded sub-processes,
+Notification, and the ad-hoc sub-process the commander drives at runtime.
+
+Drill into Containment and show the error boundary on Isolate Systems. A failed isolation raises a
+BPMN error and escalates to the commander instead of retrying forever - that's a deliberate choice,
+not a limitation.
+
+After the join: CISO Review with its severity-based SLA timer, the Recovery sub-process, the
+regulatory DMN, and when it says yes, the Legal task with a non-interrupting 72-hour timer hanging
+off it. Then the AI report and closure.
+
+Also worth showing the pool lanes - each human lane maps to the candidate group on the tasks
+inside it, so the hand-offs are visible without reading any XML.
+
+### 0:12-0:14 The decisions
+
+Open both tables. Classification takes `attackConfirmed`, `assetCriticality`, `dataExposed` and
+returns severity; the regulatory one takes `dataExposed` and `recordCount` and returns a boolean.
+
+Why FIRST: each needs one deterministic answer and the rules are an ordered precedence list.
+UNIQUE would demand the rules never overlap, which gets brittle the moment anyone adds a row.
+
+### 0:14-0:16 Start a P1
+
+Fire the P1 request, then switch straight to Operate and open the instance. Narrate what runs on
+its own: AI triage takes it to TRIAGED, the DMN sets P1, Record Classification moves it to
+CLASSIFIED, the four branches run their workers, and it parks at the human tasks.
+
+Point at the token positions and the variables panel - `severity`, `triageReport`, `slaDuration`.
+
+### 0:16-0:23 Do the work in Tasklist
+
+This is the graded part, so use Tasklist rather than the API. Show that each task arrives with the
+right group and a real form.
+
+Containment Verification (SOC analyst) and Forensic Analysis (forensics lead) are both open at
+once. Fill in the forms and complete them. Back in Operate you can watch the join release and CISO
+Review appear - accept residual risk and authorise recovery.
+
+Then Integrity Verification inside Recovery, File Regulatory Notification with the 72-hour timer
+riding on it, and finally Incident Closure. Completing that lets `close-incident` fire and the
+instance finishes. `GET /incidents/{id}` now shows CLOSED.
+
+### 0:23-0:26 An exception path
+
+Raise a second incident with `forceIsolationFailure: true`. In Operate, show isolation raising the
+BPMN error, the boundary catching it, and Handle Isolation Failure landing with the commander. The
+line to use: it escalates to a human rather than silently retrying.
+
+Mention the other two you modelled - P4 auto-close, and the 72-hour escalation.
+
+### 0:26-0:28 Persistence
+
+Switch to psql. Show the `incidents` row having walked RAISED to CLOSED, and `incident_task_outcomes`
+with a row per human task: who did it and what they submitted. The point is that the backend isn't
+a black box; every decision and every human action is on record.
+
+### 0:28-0:30 Wrap up
+
+Recap against the rubric and take questions.
+
+---
+
+## Trade-off questions to have answers for
+
+**Embedded sub-processes or call activities?** Embedded. Containment, Forensics and Recovery aren't
+reused anywhere, they work on the incident's own variables, and embedding ships everything as one
+versioned unit. A call activity buys independent versioning we'd never use, and costs variable
+mapping we'd have to maintain.
+
+**Why hit policy FIRST?** One deterministic answer, rules ordered by precedence. FIRST tolerates
+overlapping conditions; UNIQUE forbids them, which is fine now and painful later.
+
+**Why AI through a connector, and why a fallback?** They're AI Agent tasks with retries and an
+error boundary that drops to a job worker. An OpenAI outage or a missing key degrades the write-up,
+it doesn't stall an incident. Resilience over a hard dependency.
+
+**BPMN error or Operate incident?** Business deviations that a human should decide on - failed
+isolation - are BPMN errors. Technical failures retry and then raise an incident for an operator.
+The framework already draws that line; we just used it.
+
+**Idempotency?** Every worker carries `businessKey = incidentId` and the guard short-circuits
+replays, so SIEM redelivery and job retries are safe. The actions are written to be naturally
+idempotent too.
+
+**Ad-hoc sub-process or gateways?** "Pick only the actions you need" is genuine runtime selection.
+That's exactly what ad-hoc models. A gateway chain would mean guessing every combination up front.
+
+**Timers?** Severity-derived SLA on CISO Review, fixed 72 hours on the regulatory task. Both
+non-interrupting, so escalating doesn't cancel the task someone is in the middle of.
+
+## If the AI step doesn't return live text
+
+"The AI task calls OpenAI through a cluster secret. If the secret isn't there or the call fails,
+the error boundary routes to the fallback worker and the flow still completes - which is the
+resilience pattern doing its job." Then configure the secret and re-run if there's time.
+
+## Rubric checklist
+
+Process modelling and DI, two DMN tables, two AI connector steps, ad-hoc sub-process, idempotent
+workers, error handling, forms and candidate groups per persona, timers and escalation, and testing
+evidence: happy path to CLOSED plus the isolation-failure exception.

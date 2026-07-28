@@ -4,10 +4,9 @@
              name="Regulatory Decisions"
              namespace="http://camunda.org/schema/1.0/dmn">
   <!--
-    Regulatory Notification Required — decides whether Legal must file regulatory/customer
-    notifications, based on whether data was exposed and how many records were affected.
-    (A production table would also consider data categories and jurisdictions.)
-    Business rule task stores the boolean result in `regulatoryRequired`. Hit policy FIRST.
+    Does Legal have to file? Only looks at exposure and record count for now; a real table
+    would also weigh data categories and which jurisdictions are involved.
+    Result goes to `regulatoryRequired`. Hit policy FIRST.
   -->
   <decision id="regulatory-notification" name="Regulatory Notification Required">
     <decisionTable id="regulatory-notification-table" hitPolicy="FIRST">

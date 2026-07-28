@@ -4,11 +4,9 @@
              name="Incident Decisions"
              namespace="http://camunda.org/schema/1.0/dmn">
   <!--
-    Incident Classification (P1-P4) from the AI triage output.
-    Inputs come from the triage step's process variables; the business rule task stores the
-    result in the `severity` process variable.
-    Hit policy FIRST: rules are evaluated top-to-bottom and the first match wins, so the
-    order encodes precedence (false-positive first, then most-severe downwards).
+    Severity from the triage signals. Result lands in the `severity` process variable.
+    Hit policy is FIRST, so row order is the precedence: rule out false positives, then work
+    down from most severe. Last row is the catch-all.
   -->
   <decision id="incident-classification" name="Incident Classification">
     <decisionTable id="incident-classification-table" hitPolicy="FIRST">

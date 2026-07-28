@@ -15,9 +15,9 @@ import org.springframework.stereotype.Component;
 import java.util.Map;
 
 /**
- * Escalation worker (type {@code escalate}) reached from the SLA timers and the 72-hour
- * regulatory-deadline timer. Notifies the escalation target (CISO / manager). A placeholder that
- * logs and records the escalation; a real implementation would page/notify the on-call.
+ * Shared by both escalation timers: the CISO review SLA and the 72h regulatory deadline.
+ * job.getElementId() is how you tell which one fired. For now it just logs; a real one would
+ * page whoever is on call.
  */
 @Component
 public class EscalationWorker extends BaseWorker<IncidentJobVars> {

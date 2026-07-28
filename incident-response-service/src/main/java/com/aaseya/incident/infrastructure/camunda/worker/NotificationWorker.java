@@ -12,10 +12,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
-/**
- * Automated stakeholder-notification worker (type {@code notify-stakeholders}) — the third parallel
- * response stream. Could alternatively be a Camunda notification connector (allowed by the rules).
- */
+/** Third parallel stream. A connector would do just as well here. */
 @Component
 public class NotificationWorker extends BaseWorker<IncidentJobVars> {
 

@@ -1,9 +1,6 @@
 package com.aaseya.incident.domain;
 
-/**
- * Incident severity, produced by the Incident Classification DMN. Drives downstream SLAs:
- * P1 highest, P4 lowest (P4 = false positive / auto-closed).
- */
+/** Output of the classification DMN. P1 is worst; P4 means false positive. */
 public enum IncidentSeverity {
     P1,
     P2,

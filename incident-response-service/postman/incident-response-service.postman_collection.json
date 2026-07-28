@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "b1a7c0de-uc4-inc-resp-0001-000000000001",
     "name": "Incident Response Service (UC4)",
-    "description": "Drive the incident-response process end-to-end.\n\nRUN ORDER:\n1) 1 - Raise incident (saves {{incidentId}}).\n2) Wait ~25-30s for the automated chain (AI triage -> DMN classify -> parallel branches) to reach the human tasks.\n3) 3 - List active tasks (saves {{taskKey}} + {{taskKey2}}).\n4) Complete task(s): the parallel phase has TWO tasks (Containment Verification + Forensic Analysis) -> run 'Complete task by key' then 'Complete 2nd task by key'. Every later phase has ONE task -> run 'Complete active task'.\n5) Re-run 'List active tasks' between phases; repeat until it returns []. Order: [Containment + Forensic] -> CISO Review -> Integrity Verification -> File Regulatory Notification -> Incident Closure.\n6) 'Get incident' shows status CLOSED; 'Task outcomes' shows the persisted results.\n\nBase URL variable {{baseUrl}} defaults to http://localhost:8080.",
+    "description": "Drives the incident-response process end to end and covers every decision path.\n\nFolder 1 raises an incident, one request per classification scenario; each saves {{incidentId}}.\nFolder 3 lists and completes human tasks using one shared body (extra variables are ignored, so\nthe same body works for any task). Folder 4 has the exact form fields per task if you'd rather\ndemo it properly. Folder 5 is the error responses.\n\nHappy path: raise a P1, wait ~25-30s for the automated chain to reach the human tasks, list active\ntasks (saves {{taskKey}} and {{taskKey2}}), then complete. The parallel phase has two tasks open at\nonce so use both keys; everything after it has one, so 'Complete active task' is enough. Re-list\nbetween phases until it comes back empty, then check the incident is CLOSED.\n\nPhase order: [Containment + Forensic] -> CISO Review -> Integrity Verification -> File Regulatory\nNotification -> Incident Closure.\n\nResponses are wrapped in {\"data\":..., \"meta\":...}; errors are RFC 7807 problem details.\n{{baseUrl}} defaults to http://localhost:8080.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -21,6 +21,10 @@
     {
       "key": "taskKey2",
       "value": ""
+    },
+    {
+      "key": "unknownIncidentId",
+      "value": "00000000-0000-0000-0000-000000000000"
     }
   ],
   "item": [
@@ -29,6 +33,18 @@
       "item": [
         {
           "name": "Health",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('status UP', () => pm.expect(pm.response.json().status).to.eql('UP'));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [],
@@ -42,12 +58,26 @@
                 "health"
               ]
             },
-            "description": "Liveness/readiness. UP also confirms the Camunda SaaS connection is healthy."
+            "description": "UP also means the connection to the cluster is healthy."
           },
           "response": []
         },
         {
           "name": "OpenAPI (v3 api-docs)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const paths = Object.keys(pm.response.json().paths || {});",
+                  "pm.test('incident endpoints published', () => pm.expect(paths).to.include('/incidents'));",
+                  "console.log('paths:', paths.join(', '));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [],
@@ -61,27 +91,29 @@
                 "api-docs"
               ]
             },
-            "description": "Full OpenAPI spec. Swagger UI at {{baseUrl}}/swagger-ui/index.html"
+            "description": "Swagger UI is at {{baseUrl}}/swagger-ui/index.html"
           },
           "response": []
         }
       ]
     },
     {
-      "name": "1 - Start (raise incident)",
+      "name": "1 - Raise incident (classification scenarios)",
+      "description": "title and source are required; attackConfirmed, assetCriticality (LOW/MEDIUM/HIGH/CRITICAL), dataExposed and recordCount are optional and steer the two DMNs. Leave them out and you get confirmed / HIGH / exposed / 25000, i.e. a P1 that needs regulatory notification.",
       "item": [
         {
-          "name": "Raise incident (P1 happy path)",
+          "name": "P1 - default triage signals (happy path)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "const j = pm.response.json();",
-                  "pm.collectionVariables.set('incidentId', j.data.id);",
-                  "pm.test('created (RAISED)', () => pm.expect(j.data.status).to.eql('RAISED'));",
-                  "console.log('incidentId =', j.data.id);"
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const d = pm.response.json().data;",
+                  "pm.collectionVariables.set('incidentId', d.id);",
+                  "pm.test('status RAISED', () => pm.expect(d.status).to.eql('RAISED'));",
+                  "console.log('incidentId =', d.id, '| expect severity P1, regulatory notification REQUIRED');"
                 ]
               }
             }
@@ -112,21 +144,22 @@
                 "incidents"
               ]
             },
-            "description": "Starts the incident-response process. Triage inputs make this a P1 (full response). Saves {{incidentId}}."
+            "description": "No signals, so the service defaults kick in (confirmed / HIGH / exposed / 25000) and the DMN says P1. Regulatory notification is required. Full response path with every human task."
           },
           "response": []
         },
         {
-          "name": "Raise incident (isolation-failure path)",
+          "name": "P1 - CRITICAL asset (explicit signals)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "const j = pm.response.json();",
-                  "pm.collectionVariables.set('incidentId', j.data.id);",
-                  "console.log('incidentId =', j.data.id, '(isolation-failure path)');"
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const d = pm.response.json().data;",
+                  "pm.collectionVariables.set('incidentId', d.id);",
+                  "console.log('incidentId =', d.id, '| expect severity P1 (CRITICAL asset)');"
                 ]
               }
             }
@@ -141,7 +174,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Isolation-failure demo\",\n  \"source\": \"SIEM\",\n  \"forceIsolationFailure\": true\n}",
+              "raw": "{\n  \"title\": \"Domain controller compromise\",\n  \"source\": \"EDR\",\n  \"attackConfirmed\": true,\n  \"assetCriticality\": \"CRITICAL\",\n  \"dataExposed\": true,\n  \"recordCount\": 120000\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -157,66 +190,22 @@
                 "incidents"
               ]
             },
-            "description": "Exception path: automated isolation fails -> BPMN error -> escalates to the Incident Commander ('Handle Isolation Failure' task). Saves {{incidentId}}."
+            "description": "CRITICAL matches earlier in the table than the HIGH+exposed rule, so this is P1 regardless of whether data was exposed. 120000 records means Legal has to file."
           },
           "response": []
         },
         {
-          "name": "Raise incident (P4 - false positive, auto-close)",
+          "name": "P2 - HIGH asset, no data exposed",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "const j = pm.response.json();",
-                  "pm.collectionVariables.set('incidentId', j.data.id);",
-                  "console.log('incidentId =', j.data.id, '(expect severity P4 -> AUTO_CLOSED, no human tasks)');"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"title\": \"Benign alert - false positive\",\n  \"source\": \"SIEM\",\n  \"attackConfirmed\": false\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/incidents",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "incidents"
-              ]
-            },
-            "description": "Request-driven DMN: attackConfirmed=false -> the Incident Classification DMN returns P4 -> the P4 gateway auto-closes the incident (status AUTO_CLOSED). No parallel branches, no human tasks. Verify with 'Get incident'."
-          },
-          "response": []
-        },
-        {
-          "name": "Raise incident (P2 - contained, no data loss)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "const j = pm.response.json();",
-                  "pm.collectionVariables.set('incidentId', j.data.id);",
-                  "console.log('incidentId =', j.data.id, '(expect severity P2; regulatory branch skipped since dataExposed=false)');"
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const d = pm.response.json().data;",
+                  "pm.collectionVariables.set('incidentId', d.id);",
+                  "console.log('incidentId =', d.id, '| expect severity P2; File Regulatory Notification SKIPPED (dataExposed=false)');"
                 ]
               }
             }
@@ -247,7 +236,191 @@
                 "incidents"
               ]
             },
-            "description": "Request-driven DMN: HIGH criticality but no data exposed -> severity P2 (full response, drive it to CLOSED via the human tasks). The Regulatory Notification DMN returns false (dataExposed=false), so the 'File Regulatory Notification' task is skipped. Saves {{incidentId}}."
+            "description": "HIGH but nothing exposed drops it to P2. Still the full response path, but the regulatory gateway takes the no-branch so File Regulatory Notification never appears. Worth driving to CLOSED to see that."
+          },
+          "response": []
+        },
+        {
+          "name": "P3 - MEDIUM asset criticality",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const d = pm.response.json().data;",
+                  "pm.collectionVariables.set('incidentId', d.id);",
+                  "console.log('incidentId =', d.id, '| expect severity P3');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Suspicious login on internal wiki\",\n  \"source\": \"SIEM\",\n  \"attackConfirmed\": true,\n  \"assetCriticality\": \"MEDIUM\",\n  \"dataExposed\": true,\n  \"recordCount\": 900\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents"
+              ]
+            },
+            "description": "MEDIUM gives P3. Not P4, so it still runs everything. 900 records with data exposed means regulatory notification is required."
+          },
+          "response": []
+        },
+        {
+          "name": "P1 - data exposed but under the 500-record threshold",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const d = pm.response.json().data;",
+                  "pm.collectionVariables.set('incidentId', d.id);",
+                  "console.log('incidentId =', d.id, '| expect severity P1 but File Regulatory Notification SKIPPED (recordCount < 500)');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Small-scale credential leak\",\n  \"source\": \"Threat Intel\",\n  \"attackConfirmed\": true,\n  \"assetCriticality\": \"HIGH\",\n  \"dataExposed\": true,\n  \"recordCount\": 120\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents"
+              ]
+            },
+            "description": "The interesting one: still P1, but the regulatory table needs recordCount >= 500 and 120 falls through to the default false. Shows the two DMNs are independent decisions."
+          },
+          "response": []
+        },
+        {
+          "name": "P4 - false positive (auto-close)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const d = pm.response.json().data;",
+                  "pm.collectionVariables.set('incidentId', d.id);",
+                  "console.log('incidentId =', d.id, '| expect severity P4 -> AUTO_CLOSED, no human tasks. Wait ~15s then run Get incident.');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Benign alert - false positive\",\n  \"source\": \"SIEM\",\n  \"attackConfirmed\": false,\n  \"assetCriticality\": \"LOW\",\n  \"dataExposed\": false,\n  \"recordCount\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents"
+              ]
+            },
+            "description": "attackConfirmed=false hits the first rule (hit policy is FIRST), so P4, and the gateway routes straight to Auto Close. No branches, no human tasks. Give it ~15s then check Get incident says AUTO_CLOSED."
+          },
+          "response": []
+        },
+        {
+          "name": "Isolation failure (BPMN error escalation)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const d = pm.response.json().data;",
+                  "pm.collectionVariables.set('incidentId', d.id);",
+                  "console.log('incidentId =', d.id, '| expect first task = Handle Isolation Failure (incident-commander)');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Isolation-failure demo\",\n  \"source\": \"SIEM\",\n  \"forceIsolationFailure\": true,\n  \"attackConfirmed\": true,\n  \"assetCriticality\": \"CRITICAL\",\n  \"dataExposed\": true,\n  \"recordCount\": 25000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents"
+              ]
+            },
+            "description": "The isolate worker throws a BPMN error, the boundary event inside Containment catches it, and Handle Isolation Failure lands with the commander instead of Containment Verification."
           },
           "response": []
         }
@@ -264,8 +437,13 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "const j = pm.response.json();",
-                  "console.log('status =', j.data.status, '| severity =', j.data.severity);"
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "pm.test('severity is P1-P4 (or null before classification)', () =>",
+                  "  pm.expect(d.severity === null || ['P1','P2','P3','P4'].includes(d.severity)).to.be.true);",
+                  "pm.test('status is a known state', () =>",
+                  "  pm.expect(['RAISED','TRIAGED','CLASSIFIED','RECOVERING','CLOSED','AUTO_CLOSED']).to.include(d.status));",
+                  "console.log('status =', d.status, '| severity =', d.severity);"
                 ]
               }
             }
@@ -283,7 +461,7 @@
                 "{{incidentId}}"
               ]
             },
-            "description": "Current incident: severity + status (RAISED -> TRIAGED -> CLASSIFIED -> RECOVERING -> CLOSED)."
+            "description": "Severity and status. RAISED -> TRIAGED -> CLASSIFIED -> RECOVERING -> CLOSED, or AUTO_CLOSED for a P4."
           },
           "response": []
         }
@@ -300,11 +478,12 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "const j = pm.response.json();",
-                  "const items = j.data || [];",
-                  "console.log('Active tasks:', items.map(t => t.name + ' [' + t.userTaskKey + ']').join(', ') || '(none yet - wait a few seconds and retry)');",
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const items = pm.response.json().data || [];",
+                  "console.log('Active tasks:', items.map(t => t.name + ' [' + t.userTaskKey + ']').join(', ') || '(none - either still automating, or the flow is past all human tasks)');",
                   "if (items[0]) pm.collectionVariables.set('taskKey', String(items[0].userTaskKey));",
-                  "if (items[1]) pm.collectionVariables.set('taskKey2', String(items[1].userTaskKey));"
+                  "if (items[1]) pm.collectionVariables.set('taskKey2', String(items[1].userTaskKey));",
+                  "pm.test('at most 2 concurrent tasks (parallel phase)', () => pm.expect(items.length).to.be.at.most(2));"
                 ]
               }
             }
@@ -323,12 +502,24 @@
                 "tasks"
               ]
             },
-            "description": "Active Tasklist user tasks for the incident. Saves the first key to {{taskKey}} and the second (parallel phase) to {{taskKey2}}. Returns [] once the flow is past all human tasks."
+            "description": "Saves the first key to {{taskKey}} and the second to {{taskKey2}}. Empty means either the automation hasn't caught up yet, or you're past all the human tasks."
           },
           "response": []
         },
         {
           "name": "Complete task by key ({{taskKey}})",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "console.log(pm.response.json().data);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -359,12 +550,24 @@
                 "complete"
               ]
             },
-            "description": "Completes the task in {{taskKey}} with a superset of form fields (extra fields are ignored). Outcome is persisted to incident_task_outcomes."
+            "description": "Sends every form field at once. Camunda ignores the ones this task doesn't want, so one body covers all seven tasks. The outcome gets written to incident_task_outcomes."
           },
           "response": []
         },
         {
           "name": "Complete 2nd task by key ({{taskKey2}})",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "console.log(pm.response.json().data);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -395,12 +598,24 @@
                 "complete"
               ]
             },
-            "description": "Use in the parallel phase only (Containment Verification + Forensic Analysis run concurrently)."
+            "description": "Only needed in the parallel phase, where Containment Verification and Forensic Analysis are both open."
           },
           "response": []
         },
         {
           "name": "Complete active task (single-task phases)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "console.log(pm.response.json().data);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -430,12 +645,25 @@
                 "complete"
               ]
             },
-            "description": "Completes the SINGLE active task (fails if 0 or >1 are active). Use for CISO Review, Integrity Verification, File Regulatory Notification, Incident Closure."
+            "description": "Fails with 422 if there isn't exactly one task open: NO_ACTIVE_TASK for none, AMBIGUOUS_TASK during the parallel phase."
           },
           "response": []
         },
         {
           "name": "Task outcomes",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const items = pm.response.json().data || [];",
+                  "console.log('Recorded outcomes:', items.map(o => o.taskName + ' by ' + o.completedBy).join(' | ') || '(none yet)');"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [],
@@ -451,7 +679,565 @@
                 "outcomes"
               ]
             },
-            "description": "All recorded human-task outcomes for the incident (persisted in Postgres)."
+            "description": "Everything recorded for this incident, oldest first: task name, who completed it, and the variables they submitted."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4 - Per-task bodies (exact form fields)",
+      "description": "One request per task with only that task's fields, taken from src/main/resources/forms. They all point at {{taskKey}}, so list the tasks first and fire the one matching the name that gets logged.",
+      "item": [
+        {
+          "name": "Handle Isolation Failure (incident-commander)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "console.log(pm.response.json().data);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"completedBy\": \"incident.commander\",\n  \"variables\": {\n    \"manuallyContained\": true,\n    \"isolationFailureAction\": \"Automated isolation failed; hosts pulled from the network manually and switch ports disabled\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents/{{incidentId}}/tasks/{{taskKey}}/complete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents",
+                "{{incidentId}}",
+                "tasks",
+                "{{taskKey}}",
+                "complete"
+              ]
+            },
+            "description": "Only shows up if you raised with forceIsolationFailure."
+          },
+          "response": []
+        },
+        {
+          "name": "Containment Verification (soc-analyst)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "console.log(pm.response.json().data);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"completedBy\": \"soc.analyst\",\n  \"variables\": {\n    \"containmentVerified\": true,\n    \"containmentNotes\": \"Endpoints quarantined, egress to C2 blocked, no further beaconing observed for 30 minutes\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents/{{incidentId}}/tasks/{{taskKey}}/complete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents",
+                "{{incidentId}}",
+                "tasks",
+                "{{taskKey}}",
+                "complete"
+              ]
+            },
+            "description": "Containment branch of the parallel gateway."
+          },
+          "response": []
+        },
+        {
+          "name": "Forensic Analysis (forensics-lead)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "console.log(pm.response.json().data);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"completedBy\": \"forensics.lead\",\n  \"variables\": {\n    \"rootCause\": \"Phishing email delivered a loader to a finance workstation; credentials reused to move laterally to prod-db\",\n    \"impactScope\": \"Finance subnet: 1 workstation, 2 database servers. 25,000 customer records staged for exfiltration.\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents/{{incidentId}}/tasks/{{taskKey}}/complete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents",
+                "{{incidentId}}",
+                "tasks",
+                "{{taskKey}}",
+                "complete"
+              ]
+            },
+            "description": "Forensics branch. Point it at {{taskKey2}} if this one came back second in the list."
+          },
+          "response": []
+        },
+        {
+          "name": "CISO Review (ciso)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "console.log(pm.response.json().data);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"completedBy\": \"ciso\",\n  \"variables\": {\n    \"residualRiskAccepted\": true,\n    \"recoveryAuthorized\": true,\n    \"cisoNotes\": \"Containment and forensics reviewed. Residual risk accepted; recovery authorized to proceed.\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents/{{incidentId}}/tasks/{{taskKey}}/complete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents",
+                "{{incidentId}}",
+                "tasks",
+                "{{taskKey}}",
+                "complete"
+              ]
+            },
+            "description": "After the join. The SLA boundary timer escalates if this sits too long, without cancelling the task."
+          },
+          "response": []
+        },
+        {
+          "name": "Integrity Verification (soc-analyst)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "console.log(pm.response.json().data);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"completedBy\": \"soc.analyst\",\n  \"variables\": {\n    \"integrityVerified\": true,\n    \"integrityNotes\": \"Restored services scanned clean; file hashes match the known-good baseline\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents/{{incidentId}}/tasks/{{taskKey}}/complete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents",
+                "{{incidentId}}",
+                "tasks",
+                "{{taskKey}}",
+                "complete"
+              ]
+            },
+            "description": "Inside Recovery, after Restore Services."
+          },
+          "response": []
+        },
+        {
+          "name": "File Regulatory Notification (legal-compliance)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "console.log(pm.response.json().data);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"completedBy\": \"legal.compliance\",\n  \"variables\": {\n    \"jurisdictions\": \"EU (GDPR Art. 33), US-CA\",\n    \"notificationFiled\": true,\n    \"notificationDetails\": \"Supervisory authority notified at T+41h; affected data subjects notified by email\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents/{{incidentId}}/tasks/{{taskKey}}/complete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents",
+                "{{incidentId}}",
+                "tasks",
+                "{{taskKey}}",
+                "complete"
+              ]
+            },
+            "description": "Only appears when the regulatory DMN returns true, i.e. data exposed and at least 500 records. Has the 72h timer on it."
+          },
+          "response": []
+        },
+        {
+          "name": "Incident Closure (incident-commander)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "console.log(pm.response.json().data, '-> now run Get incident, expect CLOSED');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"completedBy\": \"incident.commander\",\n  \"variables\": {\n    \"lessonsLearnedCaptured\": true,\n    \"closureNotes\": \"Post-incident review complete; MFA rollout and egress filtering tracked as follow-up actions\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents/{{incidentId}}/tasks/{{taskKey}}/complete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents",
+                "{{incidentId}}",
+                "tasks",
+                "{{taskKey}}",
+                "complete"
+              ]
+            },
+            "description": "Last one. Completing it fires close-incident and the status goes to CLOSED."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5 - Negative tests (validation & business errors)",
+      "description": "RFC 7807 problem details from the framework's exception handler: bean validation gives 400 with fieldErrors, BusinessException gives 422 with an errorCode.",
+      "item": [
+        {
+          "name": "Raise without title -> 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "const p = pm.response.json();",
+                  "pm.test('reports the title field', () =>",
+                  "  pm.expect((p.fieldErrors || []).map(f => f.field)).to.include('title'));",
+                  "console.log(JSON.stringify(p.fieldErrors));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": \"SIEM\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents"
+              ]
+            },
+            "description": "title is @NotBlank, so this comes back as a problem detail with a fieldErrors entry."
+          },
+          "response": []
+        },
+        {
+          "name": "Raise with blank title and source -> 400 (two field errors)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "const fields = (pm.response.json().fieldErrors || []).map(f => f.field);",
+                  "pm.test('both fields rejected', () => {",
+                  "  pm.expect(fields).to.include('title');",
+                  "  pm.expect(fields).to.include('source');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"   \",\n  \"source\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents"
+              ]
+            },
+            "description": "Whitespace-only and empty both fail @NotBlank, so you get two entries."
+          },
+          "response": []
+        },
+        {
+          "name": "Get unknown incident -> 422 INCIDENT_NOT_FOUND",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('422 Unprocessable Entity', () => pm.response.to.have.status(422));",
+                  "pm.test('errorCode INCIDENT_NOT_FOUND', () =>",
+                  "  pm.expect(pm.response.json().errorCode).to.eql('INCIDENT_NOT_FOUND'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/incidents/{{unknownIncidentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents",
+                "{{unknownIncidentId}}"
+              ]
+            },
+            "description": "Well-formed UUID that doesn't exist. BusinessException maps to 422 with a stable errorCode."
+          },
+          "response": []
+        },
+        {
+          "name": "List tasks for unknown incident -> 422 INCIDENT_NOT_FOUND",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('422 Unprocessable Entity', () => pm.response.to.have.status(422));",
+                  "pm.test('errorCode INCIDENT_NOT_FOUND', () =>",
+                  "  pm.expect(pm.response.json().errorCode).to.eql('INCIDENT_NOT_FOUND'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/incidents/{{unknownIncidentId}}/tasks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents",
+                "{{unknownIncidentId}}",
+                "tasks"
+              ]
+            },
+            "description": "The task endpoints resolve the incident first, so they fail the same way."
+          },
+          "response": []
+        },
+        {
+          "name": "Complete active task with none / two active -> 422",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('422 Unprocessable Entity', () => pm.response.to.have.status(422));",
+                  "const code = pm.response.json().errorCode;",
+                  "pm.test('NO_ACTIVE_TASK or AMBIGUOUS_TASK', () =>",
+                  "  pm.expect(['NO_ACTIVE_TASK', 'AMBIGUOUS_TASK']).to.include(code));",
+                  "console.log('errorCode =', code);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"completedBy\": \"api.tester\",\n  \"variables\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents/{{incidentId}}/tasks/complete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents",
+                "{{incidentId}}",
+                "tasks",
+                "complete"
+              ]
+            },
+            "description": "Run it right after a P4 raise for NO_ACTIVE_TASK, or during a P1's parallel phase for AMBIGUOUS_TASK."
           },
           "response": []
         }

@@ -13,15 +13,11 @@ import org.springframework.stereotype.Component;
 import java.util.Map;
 
 /**
- * Automated containment/isolation worker (type {@code isolate-systems}).
+ * Automated containment.
  *
- * <p>On failure it returns {@code WorkResult.businessError("ISOLATION_FAILED", ...)}, which the
- * framework turns into a BPMN error (throw-error command). The BPMN must catch it with an error
- * boundary event that escalates to the incident commander — UC4: "failed isolation raises a BPMN
- * error that escalates to the incident commander rather than silently retrying forever."
- *
- * <p>Idempotent: keyed on {@code businessKey} (incident id); real isolation actions must also be
- * naturally idempotent (re-applying the same isolation is a no-op).
+ * <p>A business error here becomes a BPMN error, which the boundary event on Isolate Systems
+ * catches and turns into a task for the incident commander. That is the point: isolation failing
+ * is a decision for a human, not something to retry in a loop.
  */
 @Component
 public class IsolationWorker extends BaseWorker<IsolationVars> {
@@ -40,9 +36,9 @@ public class IsolationWorker extends BaseWorker<IsolationVars> {
         if (vars.forceIsolationFailure()) {
             return WorkResult.businessError("ISOLATION_FAILED",
                     "Automated isolation failed for incident " + vars.incidentId()
-                            + " — escalating to the incident commander.");
+                            + ", escalating to the incident commander.");
         }
-        // Placeholder for real isolation (network segmentation, host quarantine, ...).
+        // TODO: call the network segmentation / host quarantine APIs
         return WorkResult.completed(Map.of("isolated", true));
     }
 

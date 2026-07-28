@@ -11,10 +11,7 @@ import io.camunda.client.api.worker.JobClient;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.stereotype.Component;
 
-/**
- * Auto-close worker (type {@code auto-close}) for the P4 / false-positive path: the incident is
- * logged and closed without a full response.
- */
+/** P4 path: log it and close, no response effort. */
 @Component
 public class AutoCloseWorker extends BaseWorker<IncidentJobVars> {
 
@@ -33,7 +30,7 @@ public class AutoCloseWorker extends BaseWorker<IncidentJobVars> {
 
     @Override
     protected WorkResult doWork(IncidentJobVars vars, ActivatedJob job) {
-        incidentService.autoClose(vars.incidentId(), "P4 / false positive — logged and auto-closed");
+        incidentService.autoClose(vars.incidentId(), "P4 / false positive, logged and auto-closed");
         return WorkResult.completed();
     }
 

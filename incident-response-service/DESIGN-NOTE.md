@@ -1,97 +1,110 @@
-# Use Case 4 — Cyber Security Incident Response — Design Note
+# Design note: Cyber Security Incident Response
 
-**Author:** Sriram Badeti · **Platform:** Camunda 8.9 SaaS · **Backend:** Spring Boot 4 on the
-`camunda-process-framework` · **Module:** `incident-response-service`
+Sriram Badeti · Camunda 8.9 SaaS · Spring Boot 4 on `camunda-process-framework`
 
-## 1. Solution overview
-A SIEM alert starts the `incident-response` process. AI triages the threat, a DMN classifies it P1–P4,
-P1–P3 fan out into parallel Containment / Forensics / Notification streams plus an ad-hoc
-response-actions stage the incident commander drives, the CISO authorises recovery, a DMN decides
-whether regulatory notification is required (enforced by a 72-hour timer), AI drafts the
-post-incident report, and the commander closes the incident. Every automated (blue) step is an
-idempotent Spring Boot job worker on the base framework; every human (green) step is a Camunda
-Tasklist user task with a form and candidate group; the two AI (purple) steps are connector calls;
-the two decisions (orange) are DMN tables.
+## 1. What the process does
 
-## 2. Processes & sub-processes — embedded vs call activity
-Containment, Forensics and Recovery are modelled as **embedded sub-processes**, not call activities.
-Rationale: they are **not reused** by any other process, they operate entirely on the parent
-instance's variables/incident context (no independent lifecycle), and keeping them embedded ships the
-whole flow as **one deployable, versioned unit** — avoiding the extra deployment/versioning and
-variable-mapping overhead a call activity would add for no reuse benefit. The **isolation-failure
-error boundary lives inside the Containment sub-process**, so containment failures are handled within
-that scope. The P1–P3 fan-out uses a **parallel gateway** (split + join); "select only the tasks
-needed" for response actions is a **true ad-hoc sub-process** (`activeElementsCollection`), not a
-gateway chain.
+A SIEM alert starts `incident-response`. AI triages the threat, a DMN classifies it P1-P4. P4 is a
+false positive and auto-closes. P1-P3 fan out into parallel containment, forensics and notification
+streams, alongside an ad-hoc stage where the incident commander picks response actions as findings
+come in. The CISO authorises recovery, a second DMN decides whether Legal has to file (with a
+72-hour timer on that task), AI drafts the post-incident report, and the commander closes it out.
 
-## 3. DMN design
-Two decision tables, both **hit policy FIRST**, invoked from business rule tasks
-(`zeebe:calledDecision`, result mapped to a process variable):
+Automated steps are idempotent job workers, human steps are native user tasks with forms and
+candidate groups, and the two AI steps are connector tasks.
 
-- **Incident Classification** — inputs `attackConfirmed`, `assetCriticality`, `dataExposed`; output
-  `severity` (P1–P4). Rules are ordered by precedence: false-positive first (→ P4, auto-closed), then
-  most-severe downward. Severity drives the downstream SLA timer. The inputs are **request-driven**
-  process variables (supplied on `POST /incidents`, defaulting to a high-severity P1); in production
-  they would be populated by the AI triage / enrichment step rather than the caller.
-- **Regulatory Notification Required** — inputs `dataExposed`, `recordCount`; output
-  `regulatoryRequired` (boolean).
+## 2. Embedded sub-processes, not call activities
 
-**Why FIRST over UNIQUE/COLLECT:** each decision needs a **single deterministic output** and the
-rules are naturally an **ordered precedence list**; FIRST encodes that intent directly and tolerates
-overlapping conditions without the strict non-overlap obligation UNIQUE imposes (which is brittle to
-maintain as rules grow). COLLECT/RULE-ORDER don't apply (no aggregation/multi-hit needed). Inputs are
-sourced from process/AI variables, so the tables stay versionable and unit-testable in isolation.
+Containment, Forensics and Recovery are embedded. Nothing else reuses them, they work purely on the
+parent instance's variables, and they have no lifecycle of their own, so a call activity would buy
+independent versioning and variable mapping we have no use for, at the cost of shipping and
+deploying separate models.
 
-## 4. AI connector design
-Both AI steps call **OpenAI** through the HTTP REST connector (`io.camunda:http-json:1`); auth is the
-`{{secrets.OPENAI_API_TOKEN}}` cluster secret (configured in Console, never in the model).
+Keeping Containment embedded also means the isolation-failure error boundary sits inside that
+scope, which is where it belongs: a containment failure is a containment problem, not a
+whole-process problem.
 
-- **Prompts use process variables.** Triage: a SOC-triage system prompt + user prompt built from
-  `title` and `source`. Report: an incident-analyst system prompt + user prompt built from `title`,
-  `severity`, and the `triageReport`.
-- **Structured output mapping.** `resultExpression` maps `response.body.choices[1].message.content`
-  (FEEL is 1-indexed) into `triageReport` / `postIncidentReport`.
-- **Failure/timeout handling.** `retries=2`, an explicit read timeout, and an `errorExpression` that
-  raises `bpmnError("AI_STEP_FAILED")`. An **error boundary falls back to the equivalent job worker**,
-  so an AI outage/timeout never stalls the incident — the flow degrades gracefully and still
-  completes. (Swappable for the dedicated OpenAI / AI-Agent connector template in Web Modeler.)
+The P1-P3 fan-out is a plain parallel gateway. The "pick only the actions you need" part is a real
+ad-hoc sub-process driven by `activeElementsCollection`, rather than a chain of gateways guessing
+at combinations up front.
 
-## 5. Error handling & resilience
-The framework's **business-failure vs technical-failure** rule is applied deliberately:
+## 3. Decisions
 
-- **Business/expected deviations → BPMN error.** Failed automated isolation returns
-  `WorkResult.businessError("ISOLATION_FAILED")` → the framework throws a BPMN error caught by the
-  in-scope boundary, escalating to the **incident commander** rather than retrying forever.
-- **Technical/transient failures → retry then incident.** A `RetryableException` is rethrown so Zeebe
-  decrements retries and eventually raises an **incident** in Operate for an operator.
-- **Idempotency (re-delivery safe).** Every worker carries `businessKey = incidentId`; the framework's
-  `IdempotencyGuard` short-circuits replays, and the actions are written to be naturally idempotent.
-- **Timers & escalation (UC4 core).** A **severity-based, non-interrupting SLA timer** (`=slaDuration`,
-  derived from severity) on CISO Review escalates if overdue; a **non-interrupting 72-hour timer** on
-  the regulatory-notification task escalates to the CISO to enforce the legal deadline.
-- **Compensation** is not required for UC4 (no monetary/irreversible saga step); the framework's
-  `WorkResult.compensated()` pattern is available if a future step needs it.
+Two tables, both hit policy FIRST, both called from business rule tasks via `zeebe:calledDecision`.
 
-## 6. Human tasks, personas & backend
-Seven **native Camunda user tasks** (Handle Isolation Failure, Containment Verification, Forensic
-Analysis, CISO Review, Integrity Verification, File Regulatory Notification, Incident Closure), each
-with a **Camunda Form** and a **candidate group** matching the persona (`soc-analyst`,
-`incident-commander`, `forensics-lead`, `ciso`, `legal-compliance`). The backend follows the
-framework's **hexagonal layering** (ArchUnit-enforced): `web → application → infrastructure.camunda`,
-with 13 idempotent `BaseWorker` workers, an `Incident` aggregate whose status is a validated
-`AuditableEntity` state machine, and **PostgreSQL** persistence (Flyway). A task API
-(`/incidents/{id}/tasks…`) lets tasks be completed programmatically and records each outcome to
-`incident_task_outcomes`; the graded demo still completes tasks in Tasklist.
+**Incident Classification** takes `attackConfirmed`, `assetCriticality` and `dataExposed`, and
+returns `severity`. Rules are ordered by precedence: rule out false positives, then work down from
+most severe, with a catch-all at the bottom. Severity then feeds the SLA timer.
 
-## 7. Testing evidence
-- **Happy path (verified):** a P1 incident driven end-to-end to **CLOSED** — parallel Forensic
-  Analysis + Containment Verification → CISO Review → Integrity Verification → File Regulatory
-  Notification → Incident Closure — with all six task outcomes persisted in Postgres.
-- **Exception paths (modelled, demonstrable in Operate):** failed isolation → BPMN-error escalation to
-  the commander (`forceIsolationFailure=true`); P4 → auto-close; AI failure → worker fallback; and the
-  SLA / 72-hour escalation timers.
+**Regulatory Notification Required** takes `dataExposed` and `recordCount` and returns a boolean.
+A production version would also weigh data categories and jurisdictions.
 
-## 8. Notes & assumptions
-Job workers are runnable placeholders for the real integrations (SIEM/EDR/firewall/IAM/email). The AI
-steps need `OPENAI_API_TOKEN` in Console to produce live text (otherwise the fallback runs). The BPMN
-was authored independently and can be reconciled with the separately-prepared UC4 flow.
+FIRST rather than UNIQUE because both tables are naturally an ordered precedence list, and FIRST
+says exactly that. UNIQUE would force the rules never to overlap, which is fine today and painful
+the moment someone adds a row. COLLECT doesn't apply, since we want one answer, not an aggregate.
+
+The DMN inputs arrive as process variables set at `POST /incidents`. In production the AI triage
+step would populate them; letting the caller send them means any severity path can be demonstrated
+on demand.
+
+## 4. AI steps
+
+Both use the AI Agent connector (`io.camunda.agenticai:aiagent:1`) against `gpt-4o-mini`, with the
+key coming from the `OPENAI_API_TOKEN` cluster secret rather than the model.
+
+Prompts are built from process variables. Triage gets a SOC-triage system prompt plus `title` and
+`source`; the report gets an analyst prompt plus `title`, `severity` and the `triageReport` the
+first step produced. Results are mapped back through `resultExpression` into `triageReport` and
+`postIncidentReport`.
+
+Each task sets `retries=3` and an `errorExpression` that raises `bpmnError("AI_STEP_FAILED")`. An
+error boundary event then routes to the equivalent job worker. The point is that an AI outage
+degrades the quality of the write-up, not the outcome of the incident.
+
+## 5. Error handling
+
+The framework's split between business and technical failure is the organising idea.
+
+Failed isolation is a *business* outcome, not a bug: `WorkResult.businessError("ISOLATION_FAILED")`
+becomes a BPMN error, the in-scope boundary catches it, and a human decides what to do. Retrying a
+firewall call that is never going to succeed just delays that decision.
+
+Technical failures rethrow, Zeebe burns a retry, and eventually an incident shows up in Operate for
+an operator to look at.
+
+Every worker carries `businessKey = incidentId`, so the `IdempotencyGuard` short-circuits a
+redelivered alert or a replayed job. The actions themselves are written to be naturally idempotent
+too; blocking an IP twice should be a no-op.
+
+Two escalation timers, both non-interrupting so the task stays open: `=slaDuration` on CISO Review
+(derived from severity: 4h for P1 through 72h for P4) and a fixed 72 hours on the regulatory task.
+
+Compensation isn't modelled. Nothing here is a monetary or otherwise irreversible saga step, so
+there's nothing to unwind; `WorkResult.compensated()` is there if that changes.
+
+## 6. Backend
+
+Hexagonal layering with ArchUnit enforcing it: web talks to application, application talks to
+infrastructure, and only `infrastructure.camunda` ever imports the Camunda client. The `Incident`
+aggregate is an `AuditableEntity`, so illegal status transitions throw rather than silently
+corrupt state. Postgres via Flyway.
+
+The task API (`/incidents/{id}/tasks…`) exists so completions can be scripted and, more usefully,
+so the submitted form data is persisted to `incident_task_outcomes`. Camunda's history expires,
+and for an incident record that's the part you actually want to keep.
+
+## 7. What's been verified
+
+A P1 driven end to end to CLOSED: parallel forensic analysis and containment verification, then
+CISO review, integrity verification, regulatory filing and closure, with all six outcomes in
+Postgres.
+
+The exception paths are modelled and demonstrable in Operate: isolation failure escalating to the
+commander (`forceIsolationFailure=true`), P4 auto-close, AI failure falling back to the worker, and
+both escalation timers.
+
+## 8. Assumptions
+
+The workers stand in for real integrations: SIEM, EDR, firewall, IAM, email. Without
+`OPENAI_API_TOKEN` configured in Console the AI steps fail over to their fallbacks, which is fine
+for a walkthrough but means the triage and report text is canned.

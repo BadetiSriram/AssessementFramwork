@@ -9,11 +9,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Adapter over the Camunda 8.9 {@link CamundaClient} for user-task operations (search + complete)
- * against the Orchestration Cluster API v2.
- *
- * <p>Lives in {@code infrastructure.camunda} — the only place allowed to import
- * {@code io.camunda.client} (ArchUnit rule #2). Returns plain DTO records.
+ * Everything we need from {@link CamundaClient} for user tasks. Kept in one place so nothing
+ * outside this package has to import the Camunda client.
  */
 @Component
 public class CamundaTaskAdapter {
@@ -24,7 +21,13 @@ public class CamundaTaskAdapter {
         this.camunda = camunda;
     }
 
-    /** Active (CREATED) user tasks for a process instance. Retries for the search index lag. */
+    /**
+     * Tasks currently waiting on this instance.
+     *
+     * <p>The search index lags behind the engine by a moment, so a task that was just created
+     * won't show up on the first call. Polling for ~4s is enough in practice; if it's genuinely
+     * empty we return empty rather than blow up.
+     */
     public List<UserTaskView> searchActiveUserTasks(long processInstanceKey) {
         for (int attempt = 0; attempt < 10; attempt++) {
             List<UserTaskView> tasks = camunda.newUserTaskSearchRequest()
@@ -48,7 +51,6 @@ public class CamundaTaskAdapter {
         return List.of();
     }
 
-    /** Complete a user task with the given output variables (as if submitted from Tasklist). */
     public void completeUserTask(long userTaskKey, Map<String, Object> variables) {
         camunda.newCompleteUserTaskCommand(userTaskKey)
                 .variables(variables == null ? Map.of() : variables)

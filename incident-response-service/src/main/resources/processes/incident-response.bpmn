@@ -2,7 +2,59 @@
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" id="incident-response-definitions" targetNamespace="http://bpmn.io/schema/bpmn">
   <bpmn:error id="Error_IsolationFailed" name="Isolation Failed" errorCode="ISOLATION_FAILED" />
   <bpmn:error id="Error_AiFailed" name="AI Step Failed" errorCode="AI_STEP_FAILED" />
+  <!-- One pool, lanes per responsible party. Zeebe ignores lanes, they are here so the diagram
+       shows who owns what. Each human lane lines up with the candidateGroups below. -->
+  <bpmn:collaboration id="Collaboration_incident-response">
+    <bpmn:participant id="Participant_Soc" name="Security Operations - Cyber Incident Response" processRef="incident-response" />
+  </bpmn:collaboration>
   <bpmn:process id="incident-response" name="Cyber Security Incident Response" isExecutable="true">
+    <bpmn:laneSet id="LaneSet_incident-response">
+      <!-- no humans in here -->
+      <bpmn:lane id="Lane_Automation" name="Automated Response Platform (workers / DMN / AI)">
+        <bpmn:flowNodeRef>StartEvent_1</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_TriageAI</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Triage</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Classify</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_RecordClass</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_P4</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_AutoClose</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_AutoClosed</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_Split</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Notify</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AdHoc_ResponseActions</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_Join</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_EscalateSla</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_SlaEscalated</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_RegDecision</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_Reg</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_RegMerge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_EscalateCiso</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_RegEscalated</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ReportAI</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Report</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Close</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_Closed</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <!-- the analyst's two tasks are inside these sub-processes -->
+      <bpmn:lane id="Lane_SocAnalyst" name="SOC Analyst">
+        <bpmn:flowNodeRef>SubProcess_Containment</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>SubProcess_Recovery</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_ForensicsLead" name="Forensics Lead">
+        <bpmn:flowNodeRef>SubProcess_Forensics</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Ciso" name="CISO">
+        <bpmn:flowNodeRef>Task_CisoReview</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Legal" name="Legal &amp; Compliance">
+        <bpmn:flowNodeRef>Task_FileRegNotification</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <!-- Handle Isolation Failure is theirs too, but it sits inside Containment so it can't be
+           listed here -->
+      <bpmn:lane id="Lane_IncidentCommander" name="Incident Commander">
+        <bpmn:flowNodeRef>Task_Closure</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
     <bpmn:startEvent id="StartEvent_1" name="SIEM alert">
       <bpmn:outgoing>Flow_start_triageai</bpmn:outgoing>
     </bpmn:startEvent>
@@ -384,356 +436,465 @@
     <bpmn:sequenceFlow id="Flow_closure_close" sourceRef="Task_Closure" targetRef="Task_Close" />
     <bpmn:sequenceFlow id="Flow_close_end" sourceRef="Task_Close" targetRef="End_Closed" />
   </bpmn:process>
+  <!-- Automation lane is three rows: P4 branch on top, main flow in the middle, ad-hoc actions
+       and escalations underneath. -->
   <bpmndi:BPMNDiagram id="BPMNDiagram_incident-response">
-    <bpmndi:BPMNPlane id="BPMNPlane_incident-response" bpmnElement="incident-response">
+    <bpmndi:BPMNPlane id="BPMNPlane_incident-response" bpmnElement="Collaboration_incident-response">
+      <bpmndi:BPMNShape id="Participant_Soc_di" bpmnElement="Participant_Soc" isHorizontal="true">
+        <dc:Bounds x="160" y="80" width="2820" height="1020" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Automation_di" bpmnElement="Lane_Automation" isHorizontal="true">
+        <dc:Bounds x="190" y="80" width="2790" height="420" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_SocAnalyst_di" bpmnElement="Lane_SocAnalyst" isHorizontal="true">
+        <dc:Bounds x="190" y="500" width="2790" height="120" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_ForensicsLead_di" bpmnElement="Lane_ForensicsLead" isHorizontal="true">
+        <dc:Bounds x="190" y="620" width="2790" height="120" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Ciso_di" bpmnElement="Lane_Ciso" isHorizontal="true">
+        <dc:Bounds x="190" y="740" width="2790" height="120" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Legal_di" bpmnElement="Lane_Legal" isHorizontal="true">
+        <dc:Bounds x="190" y="860" width="2790" height="120" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_IncidentCommander_di" bpmnElement="Lane_IncidentCommander" isHorizontal="true">
+        <dc:Bounds x="190" y="980" width="2790" height="120" />
+      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="StartEvent_1_di" bpmnElement="StartEvent_1">
-        <dc:Bounds x="57" y="52" width="36" height="36" />
+        <dc:Bounds x="232" y="272" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="226" y="315" width="49" height="14" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_TriageAI_di" bpmnElement="Task_TriageAI">
-        <dc:Bounds x="175" y="30" width="100" height="80" />
+        <dc:Bounds x="310" y="250" width="100" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Boundary_TriageAiFailed_di" bpmnElement="Boundary_TriageAiFailed">
-        <dc:Bounds x="207" y="92" width="36" height="36" />
+        <dc:Bounds x="342" y="312" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="330" y="352" width="47" height="14" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_Triage_di" bpmnElement="Task_Triage">
-        <dc:Bounds x="325" y="30" width="100" height="80" />
+        <dc:Bounds x="460" y="250" width="100" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_Classify_di" bpmnElement="Task_Classify">
-        <dc:Bounds x="475" y="30" width="100" height="80" />
+        <dc:Bounds x="610" y="250" width="100" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_RecordClass_di" bpmnElement="Task_RecordClass">
-        <dc:Bounds x="625" y="30" width="100" height="80" />
+        <dc:Bounds x="760" y="250" width="100" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Gateway_P4_di" bpmnElement="Gateway_P4" isMarkerVisible="true">
-        <dc:Bounds x="800" y="45" width="50" height="50" />
+        <dc:Bounds x="935" y="265" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="922" y="322" width="77" height="27" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_AutoClose_di" bpmnElement="Task_AutoClose">
-        <dc:Bounds x="925" y="30" width="100" height="80" />
+        <dc:Bounds x="910" y="120" width="100" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="End_AutoClosed_di" bpmnElement="End_AutoClosed">
-        <dc:Bounds x="1107" y="52" width="36" height="36" />
+        <dc:Bounds x="1092" y="142" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1082" y="185" width="58" height="14" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Gateway_Split_di" bpmnElement="Gateway_Split">
-        <dc:Bounds x="950" y="185" width="50" height="50" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="SubProcess_Containment_di" bpmnElement="SubProcess_Containment">
-        <dc:Bounds x="1075" y="170" width="100" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Gateway_Join_di" bpmnElement="Gateway_Join">
-        <dc:Bounds x="1250" y="185" width="50" height="50" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_CisoReview_di" bpmnElement="Task_CisoReview">
-        <dc:Bounds x="1375" y="170" width="100" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Boundary_CisoSla_di" bpmnElement="Boundary_CisoSla">
-        <dc:Bounds x="1407" y="232" width="36" height="36" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="SubProcess_Recovery_di" bpmnElement="SubProcess_Recovery">
-        <dc:Bounds x="1525" y="170" width="100" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_RegDecision_di" bpmnElement="Task_RegDecision">
-        <dc:Bounds x="1675" y="170" width="100" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Gateway_Reg_di" bpmnElement="Gateway_Reg" isMarkerVisible="true">
-        <dc:Bounds x="1850" y="185" width="50" height="50" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_FileRegNotification_di" bpmnElement="Task_FileRegNotification">
-        <dc:Bounds x="1975" y="170" width="100" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Boundary_Reg72h_di" bpmnElement="Boundary_Reg72h">
-        <dc:Bounds x="2007" y="232" width="36" height="36" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Gateway_RegMerge_di" bpmnElement="Gateway_RegMerge" isMarkerVisible="true">
-        <dc:Bounds x="2150" y="185" width="50" height="50" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_ReportAI_di" bpmnElement="Task_ReportAI">
-        <dc:Bounds x="2275" y="170" width="100" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Boundary_ReportAiFailed_di" bpmnElement="Boundary_ReportAiFailed">
-        <dc:Bounds x="2307" y="232" width="36" height="36" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_Closure_di" bpmnElement="Task_Closure">
-        <dc:Bounds x="2575" y="170" width="100" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_Close_di" bpmnElement="Task_Close">
-        <dc:Bounds x="2725" y="170" width="100" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="End_Closed_di" bpmnElement="End_Closed">
-        <dc:Bounds x="2907" y="192" width="36" height="36" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_Report_di" bpmnElement="Task_Report">
-        <dc:Bounds x="2425" y="310" width="100" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="SubProcess_Forensics_di" bpmnElement="SubProcess_Forensics">
-        <dc:Bounds x="1075" y="450" width="100" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_EscalateSla_di" bpmnElement="Task_EscalateSla">
-        <dc:Bounds x="1525" y="450" width="100" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="End_SlaEscalated_di" bpmnElement="End_SlaEscalated">
-        <dc:Bounds x="1707" y="472" width="36" height="36" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_EscalateCiso_di" bpmnElement="Task_EscalateCiso">
-        <dc:Bounds x="2125" y="450" width="100" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="End_RegEscalated_di" bpmnElement="End_RegEscalated">
-        <dc:Bounds x="2307" y="472" width="36" height="36" />
+        <dc:Bounds x="1085" y="265" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1075" y="228" width="71" height="27" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_Notify_di" bpmnElement="Task_Notify">
-        <dc:Bounds x="1075" y="590" width="100" height="80" />
+        <dc:Bounds x="1210" y="250" width="100" height="80" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="AdHoc_ResponseActions_di" bpmnElement="AdHoc_ResponseActions">
-        <dc:Bounds x="1075" y="730" width="100" height="80" />
+      <bpmndi:BPMNShape id="AdHoc_ResponseActions_di" bpmnElement="AdHoc_ResponseActions" isExpanded="false">
+        <dc:Bounds x="1210" y="380" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="SubProcess_Containment_di" bpmnElement="SubProcess_Containment" isExpanded="false">
+        <dc:Bounds x="1210" y="520" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="SubProcess_Forensics_di" bpmnElement="SubProcess_Forensics" isExpanded="false">
+        <dc:Bounds x="1210" y="640" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Join_di" bpmnElement="Gateway_Join">
+        <dc:Bounds x="1385" y="265" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1398" y="228" width="24" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CisoReview_di" bpmnElement="Task_CisoReview">
+        <dc:Bounds x="1510" y="760" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Boundary_CisoSla_di" bpmnElement="Boundary_CisoSla">
+        <dc:Bounds x="1542" y="822" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1478" y="833" width="59" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_EscalateSla_di" bpmnElement="Task_EscalateSla">
+        <dc:Bounds x="1510" y="380" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_SlaEscalated_di" bpmnElement="End_SlaEscalated">
+        <dc:Bounds x="1692" y="402" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1676" y="445" width="69" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="SubProcess_Recovery_di" bpmnElement="SubProcess_Recovery" isExpanded="false">
+        <dc:Bounds x="1660" y="520" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_RegDecision_di" bpmnElement="Task_RegDecision">
+        <dc:Bounds x="1810" y="250" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Reg_di" bpmnElement="Gateway_Reg" isMarkerVisible="true">
+        <dc:Bounds x="1985" y="265" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1972" y="228" width="77" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_FileRegNotification_di" bpmnElement="Task_FileRegNotification">
+        <dc:Bounds x="2110" y="880" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Boundary_Reg72h_di" bpmnElement="Boundary_Reg72h">
+        <dc:Bounds x="2142" y="942" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2074" y="953" width="65" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_EscalateCiso_di" bpmnElement="Task_EscalateCiso">
+        <dc:Bounds x="2110" y="380" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_RegEscalated_di" bpmnElement="End_RegEscalated">
+        <dc:Bounds x="2442" y="402" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2419" y="445" width="83" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_RegMerge_di" bpmnElement="Gateway_RegMerge" isMarkerVisible="true">
+        <dc:Bounds x="2285" y="265" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ReportAI_di" bpmnElement="Task_ReportAI">
+        <dc:Bounds x="2410" y="250" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Boundary_ReportAiFailed_di" bpmnElement="Boundary_ReportAiFailed">
+        <dc:Bounds x="2442" y="312" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2430" y="352" width="47" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Report_di" bpmnElement="Task_Report">
+        <dc:Bounds x="2560" y="120" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Closure_di" bpmnElement="Task_Closure">
+        <dc:Bounds x="2560" y="1000" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Close_di" bpmnElement="Task_Close">
+        <dc:Bounds x="2710" y="250" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Closed_di" bpmnElement="End_Closed">
+        <dc:Bounds x="2892" y="272" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2891" y="315" width="38" height="14" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="Flow_start_triageai_di" bpmnElement="Flow_start_triageai">
-        <di:waypoint x="93" y="70" />
-        <di:waypoint x="175" y="70" />
+        <di:waypoint x="268" y="290" />
+        <di:waypoint x="310" y="290" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_triageai_worker_di" bpmnElement="Flow_triageai_worker">
-        <di:waypoint x="275" y="70" />
-        <di:waypoint x="325" y="70" />
+        <di:waypoint x="410" y="290" />
+        <di:waypoint x="460" y="290" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_triageaifail_worker_di" bpmnElement="Flow_triageaifail_worker">
-        <di:waypoint x="225" y="128" />
-        <di:waypoint x="225" y="140" />
-        <di:waypoint x="300" y="140" />
-        <di:waypoint x="300" y="70" />
-        <di:waypoint x="325" y="70" />
+        <di:waypoint x="360" y="348" />
+        <di:waypoint x="360" y="362" />
+        <di:waypoint x="435" y="362" />
+        <di:waypoint x="435" y="290" />
+        <di:waypoint x="460" y="290" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_triage_classify_di" bpmnElement="Flow_triage_classify">
-        <di:waypoint x="425" y="70" />
-        <di:waypoint x="475" y="70" />
+        <di:waypoint x="560" y="290" />
+        <di:waypoint x="610" y="290" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_classify_record_di" bpmnElement="Flow_classify_record">
-        <di:waypoint x="575" y="70" />
-        <di:waypoint x="625" y="70" />
+        <di:waypoint x="710" y="290" />
+        <di:waypoint x="760" y="290" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_record_p4_di" bpmnElement="Flow_record_p4">
-        <di:waypoint x="725" y="70" />
-        <di:waypoint x="800" y="70" />
+        <di:waypoint x="860" y="290" />
+        <di:waypoint x="935" y="290" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_p4_yes_di" bpmnElement="Flow_p4_yes">
-        <di:waypoint x="850" y="70" />
-        <di:waypoint x="925" y="70" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_p4_no_di" bpmnElement="Flow_p4_no">
-        <di:waypoint x="825" y="95" />
-        <di:waypoint x="825" y="210" />
-        <di:waypoint x="950" y="210" />
+        <di:waypoint x="960" y="265" />
+        <di:waypoint x="960" y="200" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="967" y="224" width="15" height="14" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_autoclose_end_di" bpmnElement="Flow_autoclose_end">
-        <di:waypoint x="1025" y="70" />
-        <di:waypoint x="1107" y="70" />
+        <di:waypoint x="1010" y="160" />
+        <di:waypoint x="1092" y="160" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_split_containment_di" bpmnElement="Flow_split_containment">
-        <di:waypoint x="1000" y="210" />
-        <di:waypoint x="1075" y="210" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_split_forensics_di" bpmnElement="Flow_split_forensics">
-        <di:waypoint x="975" y="235" />
-        <di:waypoint x="975" y="490" />
-        <di:waypoint x="1075" y="490" />
+      <bpmndi:BPMNEdge id="Flow_p4_no_di" bpmnElement="Flow_p4_no">
+        <di:waypoint x="985" y="290" />
+        <di:waypoint x="1085" y="290" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1016" y="266" width="35" height="14" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_split_notify_di" bpmnElement="Flow_split_notify">
-        <di:waypoint x="975" y="235" />
-        <di:waypoint x="975" y="630" />
-        <di:waypoint x="1075" y="630" />
+        <di:waypoint x="1135" y="290" />
+        <di:waypoint x="1210" y="290" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_split_adhoc_di" bpmnElement="Flow_split_adhoc">
-        <di:waypoint x="975" y="235" />
-        <di:waypoint x="975" y="770" />
-        <di:waypoint x="1075" y="770" />
+        <di:waypoint x="1110" y="315" />
+        <di:waypoint x="1110" y="420" />
+        <di:waypoint x="1210" y="420" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_containment_join_di" bpmnElement="Flow_containment_join">
-        <di:waypoint x="1175" y="210" />
-        <di:waypoint x="1250" y="210" />
+      <bpmndi:BPMNEdge id="Flow_split_containment_di" bpmnElement="Flow_split_containment">
+        <di:waypoint x="1110" y="315" />
+        <di:waypoint x="1110" y="560" />
+        <di:waypoint x="1210" y="560" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_join_ciso_di" bpmnElement="Flow_join_ciso">
-        <di:waypoint x="1300" y="210" />
-        <di:waypoint x="1375" y="210" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_ciso_recovery_di" bpmnElement="Flow_ciso_recovery">
-        <di:waypoint x="1475" y="210" />
-        <di:waypoint x="1525" y="210" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_sla_escalate_di" bpmnElement="Flow_sla_escalate">
-        <di:waypoint x="1425" y="268" />
-        <di:waypoint x="1425" y="490" />
-        <di:waypoint x="1525" y="490" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_recovery_reg_di" bpmnElement="Flow_recovery_reg">
-        <di:waypoint x="1625" y="210" />
-        <di:waypoint x="1675" y="210" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_reg_gw_di" bpmnElement="Flow_reg_gw">
-        <di:waypoint x="1775" y="210" />
-        <di:waypoint x="1850" y="210" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_reg_yes_di" bpmnElement="Flow_reg_yes">
-        <di:waypoint x="1900" y="210" />
-        <di:waypoint x="1975" y="210" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_reg_no_di" bpmnElement="Flow_reg_no">
-        <di:waypoint x="1875" y="235" />
-        <di:waypoint x="1875" y="280" />
-        <di:waypoint x="2175" y="280" />
-        <di:waypoint x="2175" y="235" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_reg_merge_di" bpmnElement="Flow_reg_merge">
-        <di:waypoint x="2075" y="210" />
-        <di:waypoint x="2150" y="210" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_reg72_escalate_di" bpmnElement="Flow_reg72_escalate">
-        <di:waypoint x="2025" y="268" />
-        <di:waypoint x="2025" y="490" />
-        <di:waypoint x="2125" y="490" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_regmerge_reportai_di" bpmnElement="Flow_regmerge_reportai">
-        <di:waypoint x="2200" y="210" />
-        <di:waypoint x="2275" y="210" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_reportai_closure_di" bpmnElement="Flow_reportai_closure">
-        <di:waypoint x="2375" y="210" />
-        <di:waypoint x="2575" y="210" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_reportaifail_fallback_di" bpmnElement="Flow_reportaifail_fallback">
-        <di:waypoint x="2325" y="268" />
-        <di:waypoint x="2325" y="350" />
-        <di:waypoint x="2425" y="350" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_closure_close_di" bpmnElement="Flow_closure_close">
-        <di:waypoint x="2675" y="210" />
-        <di:waypoint x="2725" y="210" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_close_end_di" bpmnElement="Flow_close_end">
-        <di:waypoint x="2825" y="210" />
-        <di:waypoint x="2907" y="210" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_reportfallback_closure_di" bpmnElement="Flow_reportfallback_closure">
-        <di:waypoint x="2525" y="350" />
-        <di:waypoint x="2625" y="350" />
-        <di:waypoint x="2625" y="250" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_forensics_join_di" bpmnElement="Flow_forensics_join">
-        <di:waypoint x="1175" y="490" />
-        <di:waypoint x="1275" y="490" />
-        <di:waypoint x="1275" y="235" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_slaescalate_end_di" bpmnElement="Flow_slaescalate_end">
-        <di:waypoint x="1625" y="490" />
-        <di:waypoint x="1707" y="490" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_regescalate_end_di" bpmnElement="Flow_regescalate_end">
-        <di:waypoint x="2225" y="490" />
-        <di:waypoint x="2307" y="490" />
+      <bpmndi:BPMNEdge id="Flow_split_forensics_di" bpmnElement="Flow_split_forensics">
+        <di:waypoint x="1110" y="315" />
+        <di:waypoint x="1110" y="680" />
+        <di:waypoint x="1210" y="680" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_notify_join_di" bpmnElement="Flow_notify_join">
-        <di:waypoint x="1175" y="630" />
-        <di:waypoint x="1275" y="630" />
-        <di:waypoint x="1275" y="235" />
+        <di:waypoint x="1310" y="290" />
+        <di:waypoint x="1385" y="290" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_adhoc_join_di" bpmnElement="Flow_adhoc_join">
-        <di:waypoint x="1175" y="770" />
-        <di:waypoint x="1275" y="770" />
-        <di:waypoint x="1275" y="235" />
+        <di:waypoint x="1310" y="420" />
+        <di:waypoint x="1360" y="420" />
+        <di:waypoint x="1360" y="290" />
+        <di:waypoint x="1385" y="290" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNShape id="Rec_Start_di" bpmnElement="Rec_Start">
-        <dc:Bounds x="57" y="52" width="36" height="36" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_Restore_di" bpmnElement="Task_Restore">
-        <dc:Bounds x="175" y="30" width="100" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_IntegrityVerify_di" bpmnElement="Task_IntegrityVerify">
-        <dc:Bounds x="325" y="30" width="100" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Rec_End_di" bpmnElement="Rec_End">
-        <dc:Bounds x="507" y="52" width="36" height="36" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNEdge id="Flow_rec_start_restore_di" bpmnElement="Flow_rec_start_restore">
-        <di:waypoint x="93" y="70" />
-        <di:waypoint x="175" y="70" />
+      <bpmndi:BPMNEdge id="Flow_containment_join_di" bpmnElement="Flow_containment_join">
+        <di:waypoint x="1310" y="560" />
+        <di:waypoint x="1345" y="560" />
+        <di:waypoint x="1345" y="290" />
+        <di:waypoint x="1385" y="290" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_rec_restore_integrity_di" bpmnElement="Flow_rec_restore_integrity">
-        <di:waypoint x="275" y="70" />
-        <di:waypoint x="325" y="70" />
+      <bpmndi:BPMNEdge id="Flow_forensics_join_di" bpmnElement="Flow_forensics_join">
+        <di:waypoint x="1310" y="680" />
+        <di:waypoint x="1330" y="680" />
+        <di:waypoint x="1330" y="290" />
+        <di:waypoint x="1385" y="290" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_rec_integrity_end_di" bpmnElement="Flow_rec_integrity_end">
-        <di:waypoint x="425" y="70" />
-        <di:waypoint x="507" y="70" />
+      <bpmndi:BPMNEdge id="Flow_join_ciso_di" bpmnElement="Flow_join_ciso">
+        <di:waypoint x="1410" y="315" />
+        <di:waypoint x="1410" y="800" />
+        <di:waypoint x="1510" y="800" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNShape id="Task_BlockIp_di" bpmnElement="Task_BlockIp">
-        <dc:Bounds x="25" y="30" width="100" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_RevokeCredentials_di" bpmnElement="Task_RevokeCredentials">
-        <dc:Bounds x="25" y="170" width="100" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_DeployPatch_di" bpmnElement="Task_DeployPatch">
-        <dc:Bounds x="25" y="310" width="100" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="For_Start_di" bpmnElement="For_Start">
-        <dc:Bounds x="57" y="52" width="36" height="36" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_CollectEvidence_di" bpmnElement="Task_CollectEvidence">
-        <dc:Bounds x="175" y="30" width="100" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_ForensicAnalysis_di" bpmnElement="Task_ForensicAnalysis">
-        <dc:Bounds x="325" y="30" width="100" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="For_End_di" bpmnElement="For_End">
-        <dc:Bounds x="507" y="52" width="36" height="36" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNEdge id="Flow_for_start_evidence_di" bpmnElement="Flow_for_start_evidence">
-        <di:waypoint x="93" y="70" />
-        <di:waypoint x="175" y="70" />
+      <bpmndi:BPMNEdge id="Flow_sla_escalate_di" bpmnElement="Flow_sla_escalate">
+        <di:waypoint x="1542" y="840" />
+        <di:waypoint x="1490" y="840" />
+        <di:waypoint x="1490" y="420" />
+        <di:waypoint x="1510" y="420" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_for_evidence_analysis_di" bpmnElement="Flow_for_evidence_analysis">
-        <di:waypoint x="275" y="70" />
-        <di:waypoint x="325" y="70" />
+      <bpmndi:BPMNEdge id="Flow_slaescalate_end_di" bpmnElement="Flow_slaescalate_end">
+        <di:waypoint x="1610" y="420" />
+        <di:waypoint x="1692" y="420" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_for_analysis_end_di" bpmnElement="Flow_for_analysis_end">
-        <di:waypoint x="425" y="70" />
-        <di:waypoint x="507" y="70" />
+      <bpmndi:BPMNEdge id="Flow_ciso_recovery_di" bpmnElement="Flow_ciso_recovery">
+        <di:waypoint x="1610" y="800" />
+        <di:waypoint x="1635" y="800" />
+        <di:waypoint x="1635" y="560" />
+        <di:waypoint x="1660" y="560" />
       </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_recovery_reg_di" bpmnElement="Flow_recovery_reg">
+        <di:waypoint x="1760" y="560" />
+        <di:waypoint x="1785" y="560" />
+        <di:waypoint x="1785" y="290" />
+        <di:waypoint x="1810" y="290" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_reg_gw_di" bpmnElement="Flow_reg_gw">
+        <di:waypoint x="1910" y="290" />
+        <di:waypoint x="1985" y="290" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_reg_yes_di" bpmnElement="Flow_reg_yes">
+        <di:waypoint x="2010" y="315" />
+        <di:waypoint x="2010" y="920" />
+        <di:waypoint x="2110" y="920" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2017" y="620" width="45" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_reg_no_di" bpmnElement="Flow_reg_no">
+        <di:waypoint x="2035" y="290" />
+        <di:waypoint x="2285" y="290" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2126" y="266" width="68" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_reg_merge_di" bpmnElement="Flow_reg_merge">
+        <di:waypoint x="2210" y="920" />
+        <di:waypoint x="2310" y="920" />
+        <di:waypoint x="2310" y="315" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_reg72_escalate_di" bpmnElement="Flow_reg72_escalate">
+        <di:waypoint x="2142" y="960" />
+        <di:waypoint x="2085" y="960" />
+        <di:waypoint x="2085" y="420" />
+        <di:waypoint x="2110" y="420" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_regescalate_end_di" bpmnElement="Flow_regescalate_end">
+        <di:waypoint x="2210" y="420" />
+        <di:waypoint x="2442" y="420" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_regmerge_reportai_di" bpmnElement="Flow_regmerge_reportai">
+        <di:waypoint x="2335" y="290" />
+        <di:waypoint x="2410" y="290" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_reportaifail_fallback_di" bpmnElement="Flow_reportaifail_fallback">
+        <di:waypoint x="2460" y="348" />
+        <di:waypoint x="2460" y="362" />
+        <di:waypoint x="2530" y="362" />
+        <di:waypoint x="2530" y="160" />
+        <di:waypoint x="2560" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_reportai_closure_di" bpmnElement="Flow_reportai_closure">
+        <di:waypoint x="2510" y="290" />
+        <di:waypoint x="2535" y="290" />
+        <di:waypoint x="2535" y="1040" />
+        <di:waypoint x="2560" y="1040" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_reportfallback_closure_di" bpmnElement="Flow_reportfallback_closure">
+        <di:waypoint x="2610" y="200" />
+        <di:waypoint x="2610" y="1000" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_closure_close_di" bpmnElement="Flow_closure_close">
+        <di:waypoint x="2660" y="1040" />
+        <di:waypoint x="2685" y="1040" />
+        <di:waypoint x="2685" y="290" />
+        <di:waypoint x="2710" y="290" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_close_end_di" bpmnElement="Flow_close_end">
+        <di:waypoint x="2810" y="290" />
+        <di:waypoint x="2892" y="290" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+  <!-- Collapsed sub-processes need their own plane, otherwise the children get drawn on the root
+       plane and land on top of the main flow. -->
+  <bpmndi:BPMNDiagram id="BPMNDiagram_Containment">
+    <bpmndi:BPMNPlane id="BPMNPlane_Containment" bpmnElement="SubProcess_Containment">
       <bpmndi:BPMNShape id="Cont_Start_di" bpmnElement="Cont_Start">
-        <dc:Bounds x="57" y="52" width="36" height="36" />
+        <dc:Bounds x="152" y="132" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_Isolate_di" bpmnElement="Task_Isolate">
-        <dc:Bounds x="175" y="30" width="100" height="80" />
+        <dc:Bounds x="240" y="110" width="100" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Boundary_IsolationFailed_di" bpmnElement="Boundary_IsolationFailed">
-        <dc:Bounds x="207" y="92" width="36" height="36" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_ContainVerify_di" bpmnElement="Task_ContainVerify">
-        <dc:Bounds x="475" y="30" width="100" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Cont_End_di" bpmnElement="Cont_End">
-        <dc:Bounds x="657" y="52" width="36" height="36" />
+        <dc:Bounds x="272" y="172" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="197" y="183" width="72" height="14" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_HandleIsoFail_di" bpmnElement="Task_HandleIsoFail">
-        <dc:Bounds x="325" y="170" width="100" height="80" />
+        <dc:Bounds x="390" y="250" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ContainVerify_di" bpmnElement="Task_ContainVerify">
+        <dc:Bounds x="540" y="110" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Cont_End_di" bpmnElement="Cont_End">
+        <dc:Bounds x="722" y="132" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="Flow_cont_start_isolate_di" bpmnElement="Flow_cont_start_isolate">
-        <di:waypoint x="93" y="70" />
-        <di:waypoint x="175" y="70" />
+        <di:waypoint x="188" y="150" />
+        <di:waypoint x="240" y="150" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_cont_isolate_verify_di" bpmnElement="Flow_cont_isolate_verify">
-        <di:waypoint x="275" y="70" />
-        <di:waypoint x="475" y="70" />
+        <di:waypoint x="340" y="150" />
+        <di:waypoint x="540" y="150" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_cont_isofail_handle_di" bpmnElement="Flow_cont_isofail_handle">
-        <di:waypoint x="225" y="128" />
-        <di:waypoint x="225" y="210" />
-        <di:waypoint x="325" y="210" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_cont_verify_end_di" bpmnElement="Flow_cont_verify_end">
-        <di:waypoint x="575" y="70" />
-        <di:waypoint x="657" y="70" />
+        <di:waypoint x="290" y="208" />
+        <di:waypoint x="290" y="290" />
+        <di:waypoint x="390" y="290" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_cont_handle_verify_di" bpmnElement="Flow_cont_handle_verify">
-        <di:waypoint x="425" y="210" />
-        <di:waypoint x="525" y="210" />
-        <di:waypoint x="525" y="110" />
+        <di:waypoint x="490" y="290" />
+        <di:waypoint x="590" y="290" />
+        <di:waypoint x="590" y="190" />
       </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_cont_verify_end_di" bpmnElement="Flow_cont_verify_end">
+        <di:waypoint x="640" y="150" />
+        <di:waypoint x="722" y="150" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_Forensics">
+    <bpmndi:BPMNPlane id="BPMNPlane_Forensics" bpmnElement="SubProcess_Forensics">
+      <bpmndi:BPMNShape id="For_Start_di" bpmnElement="For_Start">
+        <dc:Bounds x="152" y="132" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CollectEvidence_di" bpmnElement="Task_CollectEvidence">
+        <dc:Bounds x="240" y="110" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ForensicAnalysis_di" bpmnElement="Task_ForensicAnalysis">
+        <dc:Bounds x="390" y="110" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="For_End_di" bpmnElement="For_End">
+        <dc:Bounds x="572" y="132" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_for_start_evidence_di" bpmnElement="Flow_for_start_evidence">
+        <di:waypoint x="188" y="150" />
+        <di:waypoint x="240" y="150" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_for_evidence_analysis_di" bpmnElement="Flow_for_evidence_analysis">
+        <di:waypoint x="340" y="150" />
+        <di:waypoint x="390" y="150" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_for_analysis_end_di" bpmnElement="Flow_for_analysis_end">
+        <di:waypoint x="490" y="150" />
+        <di:waypoint x="572" y="150" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_Recovery">
+    <bpmndi:BPMNPlane id="BPMNPlane_Recovery" bpmnElement="SubProcess_Recovery">
+      <bpmndi:BPMNShape id="Rec_Start_di" bpmnElement="Rec_Start">
+        <dc:Bounds x="152" y="132" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Restore_di" bpmnElement="Task_Restore">
+        <dc:Bounds x="240" y="110" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_IntegrityVerify_di" bpmnElement="Task_IntegrityVerify">
+        <dc:Bounds x="390" y="110" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Rec_End_di" bpmnElement="Rec_End">
+        <dc:Bounds x="572" y="132" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_rec_start_restore_di" bpmnElement="Flow_rec_start_restore">
+        <di:waypoint x="188" y="150" />
+        <di:waypoint x="240" y="150" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_rec_restore_integrity_di" bpmnElement="Flow_rec_restore_integrity">
+        <di:waypoint x="340" y="150" />
+        <di:waypoint x="390" y="150" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_rec_integrity_end_di" bpmnElement="Flow_rec_integrity_end">
+        <di:waypoint x="490" y="150" />
+        <di:waypoint x="572" y="150" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_AdHoc">
+    <bpmndi:BPMNPlane id="BPMNPlane_AdHoc" bpmnElement="AdHoc_ResponseActions">
+      <bpmndi:BPMNShape id="Task_BlockIp_di" bpmnElement="Task_BlockIp">
+        <dc:Bounds x="160" y="110" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_RevokeCredentials_di" bpmnElement="Task_RevokeCredentials">
+        <dc:Bounds x="160" y="250" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_DeployPatch_di" bpmnElement="Task_DeployPatch">
+        <dc:Bounds x="160" y="390" width="100" height="80" />
+      </bpmndi:BPMNShape>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
 </bpmn:definitions>

@@ -1,8 +1,6 @@
 package com.aaseya.incident.web.dto;
 
-/**
- * View of a Camunda user task for an incident (from the 8.9 Orchestration Cluster API v2).
- */
+/** A user task as returned by the Orchestration Cluster API. */
 public record UserTaskView(
         long userTaskKey,
         String elementId,

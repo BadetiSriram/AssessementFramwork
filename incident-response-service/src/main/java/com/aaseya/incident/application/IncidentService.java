@@ -15,14 +15,13 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Use-case / orchestration layer for incident response. Coordinates the {@link Incident}
- * aggregate, persistence, and the Camunda process via the framework {@link ProcessService} port.
- * Transactions live here (never on the controller — ArchUnit rule 4).
+ * Ties the {@link Incident} aggregate to the Camunda process. Transactions live here, not on
+ * the controller.
  */
 @Service
 public class IncidentService {
 
-    /** BPMN process id — must match the {@code id} of the process in incident-response.bpmn. */
+    /** Must match the process id in incident-response.bpmn. */
     static final String PROCESS_ID = "incident-response";
 
     private final IncidentRepository incidentRepository;
@@ -34,28 +33,18 @@ public class IncidentService {
     }
 
     /**
-     * Raise an incident (as if a SIEM alert arrived) and start its response process.
+     * Raise an incident and kick off its response process.
      *
-     * <p>The triage signals feed the two DMNs (Incident Classification + Regulatory Notification).
-     * In production they would come from the AI triage / enrichment step; here the caller may
-     * supply them to drive a specific classification. Any {@code null} defaults to a high-severity
-     * P1 incident that requires regulatory notification (preserving the original behaviour).
-     *
-     * @param title                 short incident title
-     * @param source                alert source, e.g. "SIEM"
-     * @param forceIsolationFailure test hook: make automated isolation fail (→ BPMN error escalation)
-     * @param attackConfirmed       triage: is the attack confirmed? (default {@code true})
-     * @param assetCriticality      triage: LOW / MEDIUM / HIGH / CRITICAL (default "HIGH")
-     * @param dataExposed           triage: was data exposed? (default {@code true})
-     * @param recordCount           triage: number of records affected (default 25000)
-     * @return the persisted incident
+     * <p>The four triage signals feed the classification and regulatory DMNs. Really they should
+     * come out of the AI triage step, but letting the caller pass them means we can demo any
+     * severity path on demand. Anything left null falls back to a P1 that needs notification.
      */
     @Transactional
     public Incident raiseIncident(String title, String source, boolean forceIsolationFailure,
                                   Boolean attackConfirmed, String assetCriticality,
                                   Boolean dataExposed, Integer recordCount) {
         Incident incident = Incident.raise(title, source);
-        // save() merges (id is assigned) and returns the managed instance — use it, not `incident`.
+        // id is already assigned, so save() merges; work with the returned instance
         Incident saved = incidentRepository.save(incident);
 
         Map<String, Object> variables = new HashMap<>();
@@ -64,19 +53,15 @@ public class IncidentService {
         variables.put("title", saved.getTitle());
         variables.put("source", saved.getSource());
         variables.put("forceIsolationFailure", forceIsolationFailure);
-        // Written by the AI triage connector; initialized so it always exists even if the AI step
-        // is skipped/fails.
+        // the AI triage connector overwrites this; seed it so it exists even if that step fails
         variables.put("triageReport", "");
-        // Ad-hoc response actions the incident commander activates. Defaulted so the flow runs
-        // end-to-end; at runtime the commander selects these via the ad-hoc sub-process API as
-        // findings emerge (block-ip / revoke-credentials / deploy-patch — inner element IDs).
+        // Which ad-hoc actions to activate. In real life the commander picks these as findings
+        // come in; defaulting them keeps the demo running end to end.
         variables.put("responseActions", List.of("Task_BlockIp", "Task_RevokeCredentials"));
-        // Initialize the AI Agent connector context variables so the tasks' input mappings
-        // (=triageAgent.context / =reportAgent.context) never reference an undefined variable.
+        // The AI agent tasks map =triageAgent.context / =reportAgent.context as input, and Zeebe
+        // fails the job if the variable doesn't exist yet. Empty maps are enough.
         variables.put("triageAgent", Map.of());
         variables.put("reportAgent", Map.of());
-        // Triage signals consumed by the classification + regulatory DMNs. Request-driven, with
-        // sensible defaults so an alert with no signals still classifies as a high-severity P1.
         variables.put("attackConfirmed", attackConfirmed != null ? attackConfirmed : Boolean.TRUE);
         variables.put("assetCriticality",
                 assetCriticality != null && !assetCriticality.isBlank() ? assetCriticality : "HIGH");
@@ -97,7 +82,7 @@ public class IncidentService {
                         "No incident with id " + id));
     }
 
-    // ---- Worker callbacks (invoked from job workers via this application service) ----
+    // called from the job workers
 
     @Transactional
     public void markTriaged(String incidentId) {

@@ -13,10 +13,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
-/**
- * Recovery worker (type {@code restore-services}) — restores services from a clean state; the
- * process then routes to the integrity-verification human task. Marks the incident RECOVERING.
- */
+/** Restore from a known-good state, then a human verifies integrity. Moves us to RECOVERING. */
 @Component
 public class RestoreServicesWorker extends BaseWorker<IncidentJobVars> {
 

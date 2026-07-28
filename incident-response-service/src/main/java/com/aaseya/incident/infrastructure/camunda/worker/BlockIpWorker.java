@@ -12,10 +12,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
-/**
- * Ad-hoc response action (type {@code block-ip}): block malicious IPs/domains. Invoked by the
- * incident commander from the ad-hoc response-actions sub-process; may be invoked multiple times.
- */
+/** Ad-hoc action. The commander can fire this more than once as new IOCs turn up. */
 @Component
 public class BlockIpWorker extends BaseWorker<IncidentJobVars> {
 

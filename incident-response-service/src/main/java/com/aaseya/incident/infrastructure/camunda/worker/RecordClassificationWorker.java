@@ -13,11 +13,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
-/**
- * Records the DMN classification result on the incident aggregate (type
- * {@code record-classification}). Runs immediately after the Incident Classification DMN business
- * rule task, which sets the {@code severity} process variable ("P1".."P4").
- */
+/** Stores the DMN severity on the aggregate and derives the SLA the timers run on. */
 @Component
 public class RecordClassificationWorker extends BaseWorker<ClassificationVars> {
 
@@ -37,7 +33,7 @@ public class RecordClassificationWorker extends BaseWorker<ClassificationVars> {
     @Override
     protected WorkResult doWork(ClassificationVars vars, ActivatedJob job) {
         incidentService.recordClassification(vars.incidentId(), vars.severity());
-        // Severity drives the SLA (ISO-8601 duration) used by the human-task SLA timers.
+        // the CISO review boundary timer reads slaDuration, so it has to be an ISO-8601 duration
         String slaDuration = switch (vars.severity()) {
             case "P1" -> "PT4H";
             case "P2" -> "PT8H";

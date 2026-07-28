@@ -18,14 +18,11 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Incident aggregate for Use Case 4 (Cyber Security Incident Response).
+ * The incident aggregate.
  *
- * <p>Extends {@link AuditableEntity}&lt;{@link IncidentStatus}&gt; so status changes go through a
- * validated state machine ({@link #transition} throws {@code IllegalStateTransitionException} on an
- * illegal move). {@code @EntityListeners(AuditColumnListener.class)} stamps the four audit columns.
- *
- * <p>Framework-pure per ArchUnit rule 3 — no Spring Web / servlet / {@code io.camunda} imports.
- * Table {@code incidents} is created by {@code V2__incident_tables.sql}; {@code ddl-auto=validate}.
+ * <p>Status changes go through {@link #transition}, which rejects anything not listed in
+ * {@link #allowedTransitions}. Table lives in V2__incident_tables.sql (ddl-auto is validate,
+ * so schema changes belong in a migration, not here).
  */
 @Entity
 @Table(name = "incidents")
@@ -38,18 +35,17 @@ public class Incident extends AuditableEntity<IncidentStatus> {
     @Column(name = "id", nullable = false, updatable = false)
     private UUID id;
 
-    /** Correlation key carried through the BPMN process; drives the idempotency guard. */
+    /** Correlation key for the process instance; also what the idempotency guard keys on. */
     @Column(name = "business_key", nullable = false, updatable = false)
     private String businessKey;
 
     @Column(name = "title", nullable = false)
     private String title;
 
-    /** Origin of the alert, e.g. "SIEM". */
     @Column(name = "source", nullable = false)
     private String source;
 
-    /** Null until the classification DMN runs. */
+    // null until the classification DMN has run
     @Enumerated(EnumType.STRING)
     @Column(name = "severity")
     private IncidentSeverity severity;
@@ -58,7 +54,7 @@ public class Incident extends AuditableEntity<IncidentStatus> {
     @Column(name = "status", nullable = false)
     private IncidentStatus status = IncidentStatus.RAISED;
 
-    /** Camunda process instance key, set once the incident-response process is started. */
+    // set once the process has actually started
     @Column(name = "process_instance_key")
     private Long processInstanceKey;
 
@@ -74,7 +70,7 @@ public class Incident extends AuditableEntity<IncidentStatus> {
     protected Incident() {
     }
 
-    /** Factory for a newly raised incident. The id doubles as the business key. */
+    /** New incident straight off an alert. We reuse the id as the business key. */
     public static Incident raise(String title, String source) {
         Incident incident = new Incident();
         incident.id = UUID.randomUUID();
@@ -85,13 +81,10 @@ public class Incident extends AuditableEntity<IncidentStatus> {
         return incident;
     }
 
-    // ---- Domain operations (each guarded by the state machine) ----
-
     public void markTriaged() {
         transition(IncidentStatus.TRIAGED, "Threat triaged");
     }
 
-    /** Record the DMN classification result and move to CLASSIFIED. */
     public void classify(IncidentSeverity severity) {
         this.severity = severity;
         transition(IncidentStatus.CLASSIFIED, "Classified as " + severity);
@@ -108,8 +101,6 @@ public class Incident extends AuditableEntity<IncidentStatus> {
     public void autoClose(String reason) {
         transition(IncidentStatus.AUTO_CLOSED, reason);
     }
-
-    // ---- AuditableEntity contract ----
 
     @Override
     protected Set<IncidentStatus> allowedTransitions(IncidentStatus from) {
@@ -136,8 +127,6 @@ public class Incident extends AuditableEntity<IncidentStatus> {
     protected void appendAuditNote(String note, IncidentStatus from, IncidentStatus to) {
         log.info("Incident {} transition {} -> {}: {}", id, from, to, note);
     }
-
-    // ---- Accessors ----
 
     public UUID getId() {
         return id;

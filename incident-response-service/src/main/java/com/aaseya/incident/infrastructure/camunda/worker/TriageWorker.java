@@ -12,17 +12,10 @@ import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.stereotype.Component;
 
 /**
- * Threat-triage worker (type {@code triage-threat}) — the first automated step.
+ * Runs straight after the AI triage task, and also on the error path if that task failed.
  *
- * <p><b>Role:</b> the AI threat-triage is done by an <em>AI connector</em> task
- * ({@code Task_TriageAI}) that writes {@code triageReport}. This worker runs right after it (on the
- * happy path, and as the fallback if the AI step fails) to update the domain — so it deliberately
- * does NOT write {@code triageReport} (that belongs to the AI step).
- *
- * <p>The structured signals the classification / regulatory DMNs consume
- * ({@code attackConfirmed}, {@code assetCriticality}, {@code dataExposed}, {@code recordCount}) are
- * supplied at process start from the request (see {@code IncidentService.raiseIncident}, with P1
- * defaults), so this worker no longer hardcodes them — the DMN outcome is now request-driven.
+ * <p>It only moves the aggregate to TRIAGED. The triage narrative belongs to the AI task and the
+ * DMN input signals are set at process start, so there is nothing else to write here.
  */
 @Component
 public class TriageWorker extends BaseWorker<IncidentJobVars> {
@@ -43,8 +36,6 @@ public class TriageWorker extends BaseWorker<IncidentJobVars> {
     @Override
     protected WorkResult doWork(IncidentJobVars vars, ActivatedJob job) {
         incidentService.markTriaged(vars.incidentId());
-        // The DMN input signals (attackConfirmed / assetCriticality / dataExposed / recordCount) are
-        // set at process start from the request, so this worker only advances the domain state.
         return WorkResult.completed();
     }
 

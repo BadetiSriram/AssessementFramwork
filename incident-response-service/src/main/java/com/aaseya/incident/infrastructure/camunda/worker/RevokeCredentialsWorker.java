@@ -12,10 +12,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
-/**
- * Ad-hoc response action (type {@code revoke-credentials}): revoke compromised credentials.
- * Invoked by the incident commander from the ad-hoc response-actions sub-process.
- */
+/** Ad-hoc action: kill the compromised credentials. */
 @Component
 public class RevokeCredentialsWorker extends BaseWorker<IncidentJobVars> {
 

@@ -16,11 +16,10 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Human-task orchestration for incidents: list the active Tasklist user tasks of an incident and
- * complete them from the API (submitting the form variables to Camunda), recording each completed
- * task's outcome to the {@code incident_task_outcomes} table.
+ * Human tasks for an incident: list what's open, complete one, keep a copy of what was submitted.
  *
- * <p>Sits between the web layer and {@code infrastructure.camunda} (ArchUnit rule #1).
+ * <p>Completing through here rather than straight through Tasklist is what gives us the outcome
+ * rows; the demo can still use Tasklist if it wants to.
  */
 @Service
 public class IncidentTaskService {
@@ -45,7 +44,7 @@ public class IncidentTaskService {
         return taskAdapter.searchActiveUserTasks(processInstanceKey(incidentId));
     }
 
-    /** Complete a specific user task by key, then record its outcome. */
+    /** Look up the task first so we can record its name, then complete it. */
     @Transactional
     public UserTaskView completeTask(UUID incidentId, long userTaskKey,
                                      String completedBy, Map<String, Object> variables) {
@@ -65,7 +64,7 @@ public class IncidentTaskService {
         return info;
     }
 
-    /** Complete the single active user task of an incident (fails if 0 or &gt;1 are active). */
+    /** Convenience for the single-task phases. Ambiguous during the parallel phase, by design. */
     @Transactional
     public UserTaskView completeActiveTask(UUID incidentId, String completedBy, Map<String, Object> variables) {
         List<UserTaskView> tasks = taskAdapter.searchActiveUserTasks(processInstanceKey(incidentId));
@@ -74,7 +73,7 @@ public class IncidentTaskService {
         }
         if (tasks.size() > 1) {
             throw new BusinessException("AMBIGUOUS_TASK",
-                    "Incident " + incidentId + " has " + tasks.size() + " active tasks — complete by userTaskKey");
+                    "Incident " + incidentId + " has " + tasks.size() + " active tasks, complete by userTaskKey");
         }
         return completeTask(incidentId, tasks.get(0).userTaskKey(), completedBy, variables);
     }

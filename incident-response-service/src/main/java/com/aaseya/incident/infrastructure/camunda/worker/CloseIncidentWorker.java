@@ -11,10 +11,7 @@ import io.camunda.client.api.worker.JobClient;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.stereotype.Component;
 
-/**
- * Closes the incident aggregate (type {@code close-incident}) after the incident commander's
- * closure human task.
- */
+/** Last step, once the commander has signed off the closure task. */
 @Component
 public class CloseIncidentWorker extends BaseWorker<IncidentJobVars> {
 

@@ -2,9 +2,7 @@ package com.aaseya.incident.web.dto;
 
 import com.aaseya.incident.domain.IncidentTaskOutcome;
 
-/**
- * Outbound view of a recorded human-task outcome (safe to return from a controller — not an entity).
- */
+/** Read model for {@link IncidentTaskOutcome}. */
 public record TaskOutcomeView(
         long userTaskKey,
         String elementId,
