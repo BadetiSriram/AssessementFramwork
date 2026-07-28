@@ -1,0 +1,371 @@
+{
+  "info": {
+    "_postman_id": "b1a7c0de-uc4-inc-resp-0001-000000000001",
+    "name": "Incident Response Service (UC4)",
+    "description": "Drive the incident-response process end-to-end.\n\nRUN ORDER:\n1) 1 - Raise incident (saves {{incidentId}}).\n2) Wait ~25-30s for the automated chain (AI triage -> DMN classify -> parallel branches) to reach the human tasks.\n3) 3 - List active tasks (saves {{taskKey}} + {{taskKey2}}).\n4) Complete task(s): the parallel phase has TWO tasks (Containment Verification + Forensic Analysis) -> run 'Complete task by key' then 'Complete 2nd task by key'. Every later phase has ONE task -> run 'Complete active task'.\n5) Re-run 'List active tasks' between phases; repeat until it returns []. Order: [Containment + Forensic] -> CISO Review -> Integrity Verification -> File Regulatory Notification -> Incident Closure.\n6) 'Get incident' shows status CLOSED; 'Task outcomes' shows the persisted results.\n\nBase URL variable {{baseUrl}} defaults to http://localhost:8080.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "incidentId",
+      "value": ""
+    },
+    {
+      "key": "taskKey",
+      "value": ""
+    },
+    {
+      "key": "taskKey2",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "0 - Health & Docs",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health"
+              ]
+            },
+            "description": "Liveness/readiness. UP also confirms the Camunda SaaS connection is healthy."
+          },
+          "response": []
+        },
+        {
+          "name": "OpenAPI (v3 api-docs)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v3/api-docs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v3",
+                "api-docs"
+              ]
+            },
+            "description": "Full OpenAPI spec. Swagger UI at {{baseUrl}}/swagger-ui/index.html"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "1 - Start (raise incident)",
+      "item": [
+        {
+          "name": "Raise incident (P1 happy path)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set('incidentId', j.data.id);",
+                  "pm.test('created (RAISED)', () => pm.expect(j.data.status).to.eql('RAISED'));",
+                  "console.log('incidentId =', j.data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Ransomware + data exfiltration on prod-db\",\n  \"source\": \"SIEM\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents"
+              ]
+            },
+            "description": "Starts the incident-response process. Triage inputs make this a P1 (full response). Saves {{incidentId}}."
+          },
+          "response": []
+        },
+        {
+          "name": "Raise incident (isolation-failure path)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set('incidentId', j.data.id);",
+                  "console.log('incidentId =', j.data.id, '(isolation-failure path)');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Isolation-failure demo\",\n  \"source\": \"SIEM\",\n  \"forceIsolationFailure\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents"
+              ]
+            },
+            "description": "Exception path: automated isolation fails -> BPMN error -> escalates to the Incident Commander ('Handle Isolation Failure' task). Saves {{incidentId}}."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2 - Incident state",
+      "item": [
+        {
+          "name": "Get incident",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "console.log('status =', j.data.status, '| severity =', j.data.severity);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/incidents/{{incidentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents",
+                "{{incidentId}}"
+              ]
+            },
+            "description": "Current incident: severity + status (RAISED -> TRIAGED -> CLASSIFIED -> RECOVERING -> CLOSED)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3 - Human tasks (drive to CLOSED)",
+      "item": [
+        {
+          "name": "List active tasks",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const items = j.data || [];",
+                  "console.log('Active tasks:', items.map(t => t.name + ' [' + t.userTaskKey + ']').join(', ') || '(none yet - wait a few seconds and retry)');",
+                  "if (items[0]) pm.collectionVariables.set('taskKey', String(items[0].userTaskKey));",
+                  "if (items[1]) pm.collectionVariables.set('taskKey2', String(items[1].userTaskKey));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/incidents/{{incidentId}}/tasks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents",
+                "{{incidentId}}",
+                "tasks"
+              ]
+            },
+            "description": "Active Tasklist user tasks for the incident. Saves the first key to {{taskKey}} and the second (parallel phase) to {{taskKey2}}. Returns [] once the flow is past all human tasks."
+          },
+          "response": []
+        },
+        {
+          "name": "Complete task by key ({{taskKey}})",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"completedBy\": \"api.tester\",\n  \"variables\": {\n    \"manuallyContained\": true,\n    \"isolationFailureAction\": \"Isolated affected hosts manually\",\n    \"containmentVerified\": true,\n    \"containmentNotes\": \"Endpoints quarantined; egress blocked\",\n    \"rootCause\": \"Phishing-compromised host; lateral movement to prod-db\",\n    \"impactScope\": \"Finance subnet, 2 servers\",\n    \"residualRiskAccepted\": true,\n    \"recoveryAuthorized\": true,\n    \"cisoNotes\": \"Residual risk accepted; recovery authorized\",\n    \"integrityVerified\": true,\n    \"integrityNotes\": \"Restored systems verified clean\",\n    \"jurisdictions\": \"EU, US\",\n    \"notificationFiled\": true,\n    \"notificationDetails\": \"Filed within the 72-hour deadline\",\n    \"lessonsLearnedCaptured\": true,\n    \"closureNotes\": \"Incident resolved and closed\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents/{{incidentId}}/tasks/{{taskKey}}/complete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents",
+                "{{incidentId}}",
+                "tasks",
+                "{{taskKey}}",
+                "complete"
+              ]
+            },
+            "description": "Completes the task in {{taskKey}} with a superset of form fields (extra fields are ignored). Outcome is persisted to incident_task_outcomes."
+          },
+          "response": []
+        },
+        {
+          "name": "Complete 2nd task by key ({{taskKey2}})",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"completedBy\": \"api.tester\",\n  \"variables\": {\n    \"manuallyContained\": true,\n    \"isolationFailureAction\": \"Isolated affected hosts manually\",\n    \"containmentVerified\": true,\n    \"containmentNotes\": \"Endpoints quarantined; egress blocked\",\n    \"rootCause\": \"Phishing-compromised host; lateral movement to prod-db\",\n    \"impactScope\": \"Finance subnet, 2 servers\",\n    \"residualRiskAccepted\": true,\n    \"recoveryAuthorized\": true,\n    \"cisoNotes\": \"Residual risk accepted; recovery authorized\",\n    \"integrityVerified\": true,\n    \"integrityNotes\": \"Restored systems verified clean\",\n    \"jurisdictions\": \"EU, US\",\n    \"notificationFiled\": true,\n    \"notificationDetails\": \"Filed within the 72-hour deadline\",\n    \"lessonsLearnedCaptured\": true,\n    \"closureNotes\": \"Incident resolved and closed\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents/{{incidentId}}/tasks/{{taskKey2}}/complete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents",
+                "{{incidentId}}",
+                "tasks",
+                "{{taskKey2}}",
+                "complete"
+              ]
+            },
+            "description": "Use in the parallel phase only (Containment Verification + Forensic Analysis run concurrently)."
+          },
+          "response": []
+        },
+        {
+          "name": "Complete active task (single-task phases)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"completedBy\": \"api.tester\",\n  \"variables\": {\n    \"manuallyContained\": true,\n    \"isolationFailureAction\": \"Isolated affected hosts manually\",\n    \"containmentVerified\": true,\n    \"containmentNotes\": \"Endpoints quarantined; egress blocked\",\n    \"rootCause\": \"Phishing-compromised host; lateral movement to prod-db\",\n    \"impactScope\": \"Finance subnet, 2 servers\",\n    \"residualRiskAccepted\": true,\n    \"recoveryAuthorized\": true,\n    \"cisoNotes\": \"Residual risk accepted; recovery authorized\",\n    \"integrityVerified\": true,\n    \"integrityNotes\": \"Restored systems verified clean\",\n    \"jurisdictions\": \"EU, US\",\n    \"notificationFiled\": true,\n    \"notificationDetails\": \"Filed within the 72-hour deadline\",\n    \"lessonsLearnedCaptured\": true,\n    \"closureNotes\": \"Incident resolved and closed\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents/{{incidentId}}/tasks/complete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents",
+                "{{incidentId}}",
+                "tasks",
+                "complete"
+              ]
+            },
+            "description": "Completes the SINGLE active task (fails if 0 or >1 are active). Use for CISO Review, Integrity Verification, File Regulatory Notification, Incident Closure."
+          },
+          "response": []
+        },
+        {
+          "name": "Task outcomes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/incidents/{{incidentId}}/tasks/outcomes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents",
+                "{{incidentId}}",
+                "tasks",
+                "outcomes"
+              ]
+            },
+            "description": "All recorded human-task outcomes for the incident (persisted in Postgres)."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
