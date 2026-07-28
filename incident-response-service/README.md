@@ -108,9 +108,14 @@ Now runs as **`postgres` / `postgres`** against a fresh `incident_response` data
 tables, V2 `incidents`, V3 `incident_task_outcomes` + `incidents.process_instance_key`). Create it:
 `CREATE DATABASE incident_response OWNER postgres;` (superuser postgres/postgres).
 
-**Next iterations:**
-- Wrap Containment / Forensics / Recovery in **embedded sub-processes** (BPMN) — *pending*.
-- Optional: a `completing` task listener so Tasklist-channel completions also record outcomes.
+- **Embedded sub-processes** — Containment, Forensics, and Recovery are modeled as embedded
+  sub-processes (the isolation-failure error boundary lives inside the Containment sub-process).
+  Verified end-to-end: an incident was driven all the way to **CLOSED** via the task API (Containment
+  Verification + Forensic Analysis → CISO Review → Integrity Verification → File Regulatory
+  Notification → Incident Closure), with all six outcomes persisted to Postgres.
+
+**Optional polish:**
+- A `completing` task listener so Tasklist-channel completions also record outcomes.
 - Tune SLA/timer durations, AI prompts, and enrich the form fields.
 
 > Regenerate DI after editing the BPMN: run `bpmn-auto-layout` (the `layout.mjs` script used during
