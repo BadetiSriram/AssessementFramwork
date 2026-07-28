@@ -1,15 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" id="incident-response-definitions" targetNamespace="http://bpmn.io/schema/bpmn">
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="incident-response-definitions" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Web Modeler" exporterVersion="aeb6083" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.9.0">
   <bpmn:error id="Error_IsolationFailed" name="Isolation Failed" errorCode="ISOLATION_FAILED" />
   <bpmn:error id="Error_AiFailed" name="AI Step Failed" errorCode="AI_STEP_FAILED" />
-  <!-- One pool, lanes per responsible party. Zeebe ignores lanes, they are here so the diagram
-       shows who owns what. Each human lane lines up with the candidateGroups below. -->
   <bpmn:collaboration id="Collaboration_incident-response">
     <bpmn:participant id="Participant_Soc" name="Security Operations - Cyber Incident Response" processRef="incident-response" />
   </bpmn:collaboration>
   <bpmn:process id="incident-response" name="Cyber Security Incident Response" isExecutable="true">
     <bpmn:laneSet id="LaneSet_incident-response">
-      <!-- no humans in here -->
       <bpmn:lane id="Lane_Automation" name="Automated Response Platform (workers / DMN / AI)">
         <bpmn:flowNodeRef>StartEvent_1</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_TriageAI</bpmn:flowNodeRef>
@@ -29,13 +26,13 @@
         <bpmn:flowNodeRef>Gateway_Reg</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Gateway_RegMerge</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_EscalateCiso</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>End_RegEscalated</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_ReportAI</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>Task_Report</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_Close</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>End_Closed</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Report</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Boundary_ReportAiFailed</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_RegEscalated</bpmn:flowNodeRef>
       </bpmn:lane>
-      <!-- the analyst's two tasks are inside these sub-processes -->
       <bpmn:lane id="Lane_SocAnalyst" name="SOC Analyst">
         <bpmn:flowNodeRef>SubProcess_Containment</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>SubProcess_Recovery</bpmn:flowNodeRef>
@@ -45,12 +42,12 @@
       </bpmn:lane>
       <bpmn:lane id="Lane_Ciso" name="CISO">
         <bpmn:flowNodeRef>Task_CisoReview</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Boundary_CisoSla</bpmn:flowNodeRef>
       </bpmn:lane>
-      <bpmn:lane id="Lane_Legal" name="Legal &amp; Compliance">
+      <bpmn:lane id="Lane_Legal" name="Legal &#38; Compliance">
         <bpmn:flowNodeRef>Task_FileRegNotification</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Boundary_Reg72h</bpmn:flowNodeRef>
       </bpmn:lane>
-      <!-- Handle Isolation Failure is theirs too, but it sits inside Containment so it can't be
-           listed here -->
       <bpmn:lane id="Lane_IncidentCommander" name="Incident Commander">
         <bpmn:flowNodeRef>Task_Closure</bpmn:flowNodeRef>
       </bpmn:lane>
@@ -58,7 +55,7 @@
     <bpmn:startEvent id="StartEvent_1" name="SIEM alert">
       <bpmn:outgoing>Flow_start_triageai</bpmn:outgoing>
     </bpmn:startEvent>
-    <bpmn:serviceTask id="Task_TriageAI" name="AI Threat Triage" zeebe:modelerTemplate="Template_0oit8ac" zeebe:modelerTemplateVersion="1">
+    <bpmn:serviceTask id="Task_TriageAI" name="AI Threat Triage" zeebe:modelerTemplate="io.camunda.connectors.agenticai.aiagent.v1" zeebe:modelerTemplateVersion="7" zeebe:modelerTemplateIcon="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMTYiIGN5PSIxNiIgcj0iMTYiIGZpbGw9IiNBNTZFRkYiLz4KPG1hc2sgaWQ9InBhdGgtMi1vdXRzaWRlLTFfMTg1XzYiIG1hc2tVbml0cz0idXNlclNwYWNlT25Vc2UiIHg9IjQiIHk9IjQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgZmlsbD0iYmxhY2siPgo8cmVjdCBmaWxsPSJ3aGl0ZSIgeD0iNCIgeT0iNCIgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0Ii8+CjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMjAuMDEwNSAxMi4wOTg3QzE4LjQ5IDEwLjU4OTQgMTcuMTU5NCA4LjEwODE0IDE2LjE3OTkgNi4wMTEwM0MxNi4xNTIgNi4wMDQ1MSAxNi4xMTc2IDYgMTYuMDc5NCA2QzE2LjA0MTEgNiAxNi4wMDY2IDYuMDA0NTEgMTUuOTc4OCA2LjAxMTA0QzE0Ljk5OTQgOC4xMDgxNCAxMy42Njk3IDEwLjU4ODkgMTIuMTQ4MSAxMi4wOTgxQzEwLjYyNjkgMTMuNjA3MSA4LjEyNTY4IDE0LjkyNjQgNi4wMTE1NyAxNS44OTgxQzYuMDA0NzQgMTUuOTI2MSA2IDE1Ljk2MTEgNiAxNkM2IDE2LjAzODcgNi4wMDQ2OCAxNi4wNzM2IDYuMDExNDQgMTYuMTAxNEM4LjEyNTE5IDE3LjA3MjkgMTAuNjI2MiAxOC4zOTE5IDEyLjE0NzcgMTkuOTAxNkMxMy42Njk3IDIxLjQxMDcgMTQuOTk5NiAyMy44OTIgMTUuOTc5MSAyNS45ODlDMTYuMDA2OCAyNS45OTU2IDE2LjA0MTEgMjYgMTYuMDc5MyAyNkMxNi4xMTc1IDI2IDE2LjE1MTkgMjUuOTk1NCAxNi4xNzk2IDI1Ljk4OUMxNy4xNTkxIDIzLjg5MiAxOC40ODg4IDIxLjQxMSAyMC4wMDk5IDE5LjkwMjFNMjAuMDA5OSAxOS45MDIxQzIxLjUyNTMgMTguMzk4NyAyMy45NDY1IDE3LjA2NjkgMjUuOTkxNSAxNi4wODI0QzI1Ljk5NjUgMTYuMDU5MyAyNiAxNi4wMzEgMjYgMTUuOTk5N0MyNiAxNS45Njg0IDI1Ljk5NjUgMTUuOTQwMyAyNS45OTE1IDE1LjkxNzFDMjMuOTQ3NCAxNC45MzI3IDIxLjUyNTkgMTMuNjAxIDIwLjAxMDUgMTIuMDk4NyIvPgo8L21hc2s+CjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMjAuMDEwNSAxMi4wOTg3QzE4LjQ5IDEwLjU4OTQgMTcuMTU5NCA4LjEwODE0IDE2LjE3OTkgNi4wMTEwM0MxNi4xNTIgNi4wMDQ1MSAxNi4xMTc2IDYgMTYuMDc5NCA2QzE2LjA0MTEgNiAxNi4wMDY2IDYuMDA0NTEgMTUuOTc4OCA2LjAxMTA0QzE0Ljk5OTQgOC4xMDgxNCAxMy42Njk3IDEwLjU4ODkgMTIuMTQ4MSAxMi4wOTgxQzEwLjYyNjkgMTMuNjA3MSA4LjEyNTY4IDE0LjkyNjQgNi4wMTE1NyAxNS44OTgxQzYuMDA0NzQgMTUuOTI2MSA2IDE1Ljk2MTEgNiAxNkM2IDE2LjAzODcgNi4wMDQ2OCAxNi4wNzM2IDYuMDExNDQgMTYuMTAxNEM4LjEyNTE5IDE3LjA3MjkgMTAuNjI2MiAxOC4zOTE5IDEyLjE0NzcgMTkuOTAxNkMxMy42Njk3IDIxLjQxMDcgMTQuOTk5NiAyMy44OTIgMTUuOTc5MSAyNS45ODlDMTYuMDA2OCAyNS45OTU2IDE2LjA0MTEgMjYgMTYuMDc5MyAyNkMxNi4xMTc1IDI2IDE2LjE1MTkgMjUuOTk1NCAxNi4xNzk2IDI1Ljk4OUMxNy4xNTkxIDIzLjg5MiAxOC40ODg4IDIxLjQxMSAyMC4wMDk5IDE5LjkwMjFNMjAuMDA5OSAxOS45MDIxQzIxLjUyNTMgMTguMzk4NyAyMy45NDY1IDE3LjA2NjkgMjUuOTkxNSAxNi4wODI0QzI1Ljk5NjUgMTYuMDU5MyAyNiAxNi4wMzEgMjYgMTUuOTk5N0MyNiAxNS45Njg0IDI1Ljk5NjUgMTUuOTQwMyAyNS45OTE1IDE1LjkxNzFDMjMuOTQ3NCAxNC45MzI3IDIxLjUyNTkgMTMuNjAxIDIwLjAxMDUgMTIuMDk4NyIgZmlsbD0id2hpdGUiLz4KPHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0yMC4wMTA1IDEyLjA5ODdDMTguNDkgMTAuNTg5NCAxNy4xNTk0IDguMTA4MTQgMTYuMTc5OSA2LjAxMTAzQzE2LjE1MiA2LjAwNDUxIDE2LjExNzYgNiAxNi4wNzk0IDZDMTYuMDQxMSA2IDE2LjAwNjYgNi4wMDQ1MSAxNS45Nzg4IDYuMDExMDRDMTQuOTk5NCA4LjEwODE0IDEzLjY2OTcgMTAuNTg4OSAxMi4xNDgxIDEyLjA5ODFDMTAuNjI2OSAxMy42MDcxIDguMTI1NjggMTQuOTI2NCA2LjAxMTU3IDE1Ljg5ODFDNi4wMDQ3NCAxNS45MjYxIDYgMTUuOTYxMSA2IDE2QzYgMTYuMDM4NyA2LjAwNDY4IDE2LjA3MzYgNi4wMTE0NCAxNi4xMDE0QzguMTI1MTkgMTcuMDcyOSAxMC42MjYyIDE4LjM5MTkgMTIuMTQ3NyAxOS45MDE2QzEzLjY2OTcgMjEuNDEwNyAxNC45OTk2IDIzLjg5MiAxNS45NzkxIDI1Ljk4OUMxNi4wMDY4IDI1Ljk5NTYgMTYuMDQxMSAyNiAxNi4wNzkzIDI2QzE2LjExNzUgMjYgMTYuMTUxOSAyNS45OTU0IDE2LjE3OTYgMjUuOTg5QzE3LjE1OTEgMjMuODkyIDE4LjQ4ODggMjEuNDExIDIwLjAwOTkgMTkuOTAyMU0yMC4wMDk5IDE5LjkwMjFDMjEuNTI1MyAxOC4zOTg3IDIzLjk0NjUgMTcuMDY2OSAyNS45OTE1IDE2LjA4MjRDMjUuOTk2NSAxNi4wNTkzIDI2IDE2LjAzMSAyNiAxNS45OTk3QzI2IDE1Ljk2ODQgMjUuOTk2NSAxNS45NDAzIDI1Ljk5MTUgMTUuOTE3MUMyMy45NDc0IDE0LjkzMjcgMjEuNTI1OSAxMy42MDEgMjAuMDEwNSAxMi4wOTg3IiBzdHJva2U9IiM0OTFEOEIiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgbWFzaz0idXJsKCNwYXRoLTItb3V0c2lkZS0xXzE4NV82KSIvPgo8L3N2Zz4K">
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="io.camunda.agenticai:aiagent:1" retries="3" />
         <zeebe:ioMapping>
@@ -72,6 +69,8 @@
           <zeebe:input source="20" target="data.memory.contextWindowSize" />
           <zeebe:input source="5" target="data.limits.maxModelCalls" />
           <zeebe:input source="text" target="data.response.format.type" />
+          <zeebe:input source="=false" target="data.response.format.parseJson" />
+          <zeebe:input source="=false" target="data.response.includeAssistantMessage" />
         </zeebe:ioMapping>
         <zeebe:taskHeaders>
           <zeebe:header key="elementTemplateVersion" value="7" />
@@ -252,12 +251,6 @@
       <bpmn:incoming>Flow_join_ciso</bpmn:incoming>
       <bpmn:outgoing>Flow_ciso_recovery</bpmn:outgoing>
     </bpmn:userTask>
-    <bpmn:boundaryEvent id="Boundary_CisoSla" name="SLA breach" cancelActivity="false" attachedToRef="Task_CisoReview">
-      <bpmn:outgoing>Flow_sla_escalate</bpmn:outgoing>
-      <bpmn:timerEventDefinition id="Timer_CisoSla">
-        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">=slaDuration</bpmn:timeDuration>
-      </bpmn:timerEventDefinition>
-    </bpmn:boundaryEvent>
     <bpmn:serviceTask id="Task_EscalateSla" name="Escalate SLA Breach">
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="escalate" />
@@ -318,12 +311,6 @@
       <bpmn:incoming>Flow_reg_yes</bpmn:incoming>
       <bpmn:outgoing>Flow_reg_merge</bpmn:outgoing>
     </bpmn:userTask>
-    <bpmn:boundaryEvent id="Boundary_Reg72h" name="72h deadline" cancelActivity="false" attachedToRef="Task_FileRegNotification">
-      <bpmn:outgoing>Flow_reg72_escalate</bpmn:outgoing>
-      <bpmn:timerEventDefinition id="Timer_Reg72h">
-        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT72H</bpmn:timeDuration>
-      </bpmn:timerEventDefinition>
-    </bpmn:boundaryEvent>
     <bpmn:serviceTask id="Task_EscalateCiso" name="Escalate to CISO (72h)">
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="escalate" />
@@ -331,15 +318,12 @@
       <bpmn:incoming>Flow_reg72_escalate</bpmn:incoming>
       <bpmn:outgoing>Flow_regescalate_end</bpmn:outgoing>
     </bpmn:serviceTask>
-    <bpmn:endEvent id="End_RegEscalated" name="Deadline escalated">
-      <bpmn:incoming>Flow_regescalate_end</bpmn:incoming>
-    </bpmn:endEvent>
     <bpmn:exclusiveGateway id="Gateway_RegMerge">
       <bpmn:incoming>Flow_reg_no</bpmn:incoming>
       <bpmn:incoming>Flow_reg_merge</bpmn:incoming>
       <bpmn:outgoing>Flow_regmerge_reportai</bpmn:outgoing>
     </bpmn:exclusiveGateway>
-    <bpmn:serviceTask id="Task_ReportAI" name="AI Post-Incident Report" zeebe:modelerTemplate="Template_0oit8ac" zeebe:modelerTemplateVersion="1">
+    <bpmn:serviceTask id="Task_ReportAI" name="AI Post-Incident Report" zeebe:modelerTemplate="io.camunda.connectors.agenticai.aiagent.v1" zeebe:modelerTemplateVersion="7" zeebe:modelerTemplateIcon="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMTYiIGN5PSIxNiIgcj0iMTYiIGZpbGw9IiNBNTZFRkYiLz4KPG1hc2sgaWQ9InBhdGgtMi1vdXRzaWRlLTFfMTg1XzYiIG1hc2tVbml0cz0idXNlclNwYWNlT25Vc2UiIHg9IjQiIHk9IjQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgZmlsbD0iYmxhY2siPgo8cmVjdCBmaWxsPSJ3aGl0ZSIgeD0iNCIgeT0iNCIgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0Ii8+CjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMjAuMDEwNSAxMi4wOTg3QzE4LjQ5IDEwLjU4OTQgMTcuMTU5NCA4LjEwODE0IDE2LjE3OTkgNi4wMTEwM0MxNi4xNTIgNi4wMDQ1MSAxNi4xMTc2IDYgMTYuMDc5NCA2QzE2LjA0MTEgNiAxNi4wMDY2IDYuMDA0NTEgMTUuOTc4OCA2LjAxMTA0QzE0Ljk5OTQgOC4xMDgxNCAxMy42Njk3IDEwLjU4ODkgMTIuMTQ4MSAxMi4wOTgxQzEwLjYyNjkgMTMuNjA3MSA4LjEyNTY4IDE0LjkyNjQgNi4wMTE1NyAxNS44OTgxQzYuMDA0NzQgMTUuOTI2MSA2IDE1Ljk2MTEgNiAxNkM2IDE2LjAzODcgNi4wMDQ2OCAxNi4wNzM2IDYuMDExNDQgMTYuMTAxNEM4LjEyNTE5IDE3LjA3MjkgMTAuNjI2MiAxOC4zOTE5IDEyLjE0NzcgMTkuOTAxNkMxMy42Njk3IDIxLjQxMDcgMTQuOTk5NiAyMy44OTIgMTUuOTc5MSAyNS45ODlDMTYuMDA2OCAyNS45OTU2IDE2LjA0MTEgMjYgMTYuMDc5MyAyNkMxNi4xMTc1IDI2IDE2LjE1MTkgMjUuOTk1NCAxNi4xNzk2IDI1Ljk4OUMxNy4xNTkxIDIzLjg5MiAxOC40ODg4IDIxLjQxMSAyMC4wMDk5IDE5LjkwMjFNMjAuMDA5OSAxOS45MDIxQzIxLjUyNTMgMTguMzk4NyAyMy45NDY1IDE3LjA2NjkgMjUuOTkxNSAxNi4wODI0QzI1Ljk5NjUgMTYuMDU5MyAyNiAxNi4wMzEgMjYgMTUuOTk5N0MyNiAxNS45Njg0IDI1Ljk5NjUgMTUuOTQwMyAyNS45OTE1IDE1LjkxNzFDMjMuOTQ3NCAxNC45MzI3IDIxLjUyNTkgMTMuNjAxIDIwLjAxMDUgMTIuMDk4NyIvPgo8L21hc2s+CjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMjAuMDEwNSAxMi4wOTg3QzE4LjQ5IDEwLjU4OTQgMTcuMTU5NCA4LjEwODE0IDE2LjE3OTkgNi4wMTEwM0MxNi4xNTIgNi4wMDQ1MSAxNi4xMTc2IDYgMTYuMDc5NCA2QzE2LjA0MTEgNiAxNi4wMDY2IDYuMDA0NTEgMTUuOTc4OCA2LjAxMTA0QzE0Ljk5OTQgOC4xMDgxNCAxMy42Njk3IDEwLjU4ODkgMTIuMTQ4MSAxMi4wOTgxQzEwLjYyNjkgMTMuNjA3MSA4LjEyNTY4IDE0LjkyNjQgNi4wMTE1NyAxNS44OTgxQzYuMDA0NzQgMTUuOTI2MSA2IDE1Ljk2MTEgNiAxNkM2IDE2LjAzODcgNi4wMDQ2OCAxNi4wNzM2IDYuMDExNDQgMTYuMTAxNEM4LjEyNTE5IDE3LjA3MjkgMTAuNjI2MiAxOC4zOTE5IDEyLjE0NzcgMTkuOTAxNkMxMy42Njk3IDIxLjQxMDcgMTQuOTk5NiAyMy44OTIgMTUuOTc5MSAyNS45ODlDMTYuMDA2OCAyNS45OTU2IDE2LjA0MTEgMjYgMTYuMDc5MyAyNkMxNi4xMTc1IDI2IDE2LjE1MTkgMjUuOTk1NCAxNi4xNzk2IDI1Ljk4OUMxNy4xNTkxIDIzLjg5MiAxOC40ODg4IDIxLjQxMSAyMC4wMDk5IDE5LjkwMjFNMjAuMDA5OSAxOS45MDIxQzIxLjUyNTMgMTguMzk4NyAyMy45NDY1IDE3LjA2NjkgMjUuOTkxNSAxNi4wODI0QzI1Ljk5NjUgMTYuMDU5MyAyNiAxNi4wMzEgMjYgMTUuOTk5N0MyNiAxNS45Njg0IDI1Ljk5NjUgMTUuOTQwMyAyNS45OTE1IDE1LjkxNzFDMjMuOTQ3NCAxNC45MzI3IDIxLjUyNTkgMTMuNjAxIDIwLjAxMDUgMTIuMDk4NyIgZmlsbD0id2hpdGUiLz4KPHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0yMC4wMTA1IDEyLjA5ODdDMTguNDkgMTAuNTg5NCAxNy4xNTk0IDguMTA4MTQgMTYuMTc5OSA2LjAxMTAzQzE2LjE1MiA2LjAwNDUxIDE2LjExNzYgNiAxNi4wNzk0IDZDMTYuMDQxMSA2IDE2LjAwNjYgNi4wMDQ1MSAxNS45Nzg4IDYuMDExMDRDMTQuOTk5NCA4LjEwODE0IDEzLjY2OTcgMTAuNTg4OSAxMi4xNDgxIDEyLjA5ODFDMTAuNjI2OSAxMy42MDcxIDguMTI1NjggMTQuOTI2NCA2LjAxMTU3IDE1Ljg5ODFDNi4wMDQ3NCAxNS45MjYxIDYgMTUuOTYxMSA2IDE2QzYgMTYuMDM4NyA2LjAwNDY4IDE2LjA3MzYgNi4wMTE0NCAxNi4xMDE0QzguMTI1MTkgMTcuMDcyOSAxMC42MjYyIDE4LjM5MTkgMTIuMTQ3NyAxOS45MDE2QzEzLjY2OTcgMjEuNDEwNyAxNC45OTk2IDIzLjg5MiAxNS45NzkxIDI1Ljk4OUMxNi4wMDY4IDI1Ljk5NTYgMTYuMDQxMSAyNiAxNi4wNzkzIDI2QzE2LjExNzUgMjYgMTYuMTUxOSAyNS45OTU0IDE2LjE3OTYgMjUuOTg5QzE3LjE1OTEgMjMuODkyIDE4LjQ4ODggMjEuNDExIDIwLjAwOTkgMTkuOTAyMU0yMC4wMDk5IDE5LjkwMjFDMjEuNTI1MyAxOC4zOTg3IDIzLjk0NjUgMTcuMDY2OSAyNS45OTE1IDE2LjA4MjRDMjUuOTk2NSAxNi4wNTkzIDI2IDE2LjAzMSAyNiAxNS45OTk3QzI2IDE1Ljk2ODQgMjUuOTk2NSAxNS45NDAzIDI1Ljk5MTUgMTUuOTE3MUMyMy45NDc0IDE0LjkzMjcgMjEuNTI1OSAxMy42MDEgMjAuMDEwNSAxMi4wOTg3IiBzdHJva2U9IiM0OTFEOEIiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgbWFzaz0idXJsKCNwYXRoLTItb3V0c2lkZS0xXzE4NV82KSIvPgo8L3N2Zz4K">
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="io.camunda.agenticai:aiagent:1" retries="3" />
         <zeebe:ioMapping>
@@ -353,6 +337,8 @@
           <zeebe:input source="20" target="data.memory.contextWindowSize" />
           <zeebe:input source="5" target="data.limits.maxModelCalls" />
           <zeebe:input source="text" target="data.response.format.type" />
+          <zeebe:input source="=false" target="data.response.format.parseJson" />
+          <zeebe:input source="=false" target="data.response.includeAssistantMessage" />
         </zeebe:ioMapping>
         <zeebe:taskHeaders>
           <zeebe:header key="elementTemplateVersion" value="7" />
@@ -365,17 +351,6 @@
       </bpmn:extensionElements>
       <bpmn:incoming>Flow_regmerge_reportai</bpmn:incoming>
       <bpmn:outgoing>Flow_reportai_closure</bpmn:outgoing>
-    </bpmn:serviceTask>
-    <bpmn:boundaryEvent id="Boundary_ReportAiFailed" name="AI failed" attachedToRef="Task_ReportAI">
-      <bpmn:outgoing>Flow_reportaifail_fallback</bpmn:outgoing>
-      <bpmn:errorEventDefinition id="ErrorDef_ReportAi" errorRef="Error_AiFailed" />
-    </bpmn:boundaryEvent>
-    <bpmn:serviceTask id="Task_Report" name="Generate Report (fallback)">
-      <bpmn:extensionElements>
-        <zeebe:taskDefinition type="generate-report" />
-      </bpmn:extensionElements>
-      <bpmn:incoming>Flow_reportaifail_fallback</bpmn:incoming>
-      <bpmn:outgoing>Flow_reportfallback_closure</bpmn:outgoing>
     </bpmn:serviceTask>
     <bpmn:userTask id="Task_Closure" name="Incident Closure">
       <bpmn:extensionElements>
@@ -435,31 +410,55 @@
     <bpmn:sequenceFlow id="Flow_reportfallback_closure" sourceRef="Task_Report" targetRef="Task_Closure" />
     <bpmn:sequenceFlow id="Flow_closure_close" sourceRef="Task_Closure" targetRef="Task_Close" />
     <bpmn:sequenceFlow id="Flow_close_end" sourceRef="Task_Close" targetRef="End_Closed" />
+    <bpmn:serviceTask id="Task_Report" name="Generate Report (fallback)">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="generate-report" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_reportaifail_fallback</bpmn:incoming>
+      <bpmn:outgoing>Flow_reportfallback_closure</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:boundaryEvent id="Boundary_ReportAiFailed" name="AI failed" attachedToRef="Task_ReportAI">
+      <bpmn:outgoing>Flow_reportaifail_fallback</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="ErrorDef_ReportAi" errorRef="Error_AiFailed" />
+    </bpmn:boundaryEvent>
+    <bpmn:boundaryEvent id="Boundary_Reg72h" name="72h deadline" cancelActivity="false" attachedToRef="Task_FileRegNotification">
+      <bpmn:outgoing>Flow_reg72_escalate</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Timer_Reg72h">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT72H</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:endEvent id="End_RegEscalated" name="Deadline escalated">
+      <bpmn:incoming>Flow_regescalate_end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:boundaryEvent id="Boundary_CisoSla" name="SLA breach" cancelActivity="false" attachedToRef="Task_CisoReview">
+      <bpmn:outgoing>Flow_sla_escalate</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Timer_CisoSla">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">=slaDuration</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
   </bpmn:process>
-  <!-- Automation lane is three rows: P4 branch on top, main flow in the middle, ad-hoc actions
-       and escalations underneath. -->
   <bpmndi:BPMNDiagram id="BPMNDiagram_incident-response">
     <bpmndi:BPMNPlane id="BPMNPlane_incident-response" bpmnElement="Collaboration_incident-response">
       <bpmndi:BPMNShape id="Participant_Soc_di" bpmnElement="Participant_Soc" isHorizontal="true">
         <dc:Bounds x="160" y="80" width="2820" height="1020" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Lane_Automation_di" bpmnElement="Lane_Automation" isHorizontal="true">
-        <dc:Bounds x="190" y="80" width="2790" height="420" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Lane_SocAnalyst_di" bpmnElement="Lane_SocAnalyst" isHorizontal="true">
-        <dc:Bounds x="190" y="500" width="2790" height="120" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Lane_ForensicsLead_di" bpmnElement="Lane_ForensicsLead" isHorizontal="true">
-        <dc:Bounds x="190" y="620" width="2790" height="120" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Lane_Ciso_di" bpmnElement="Lane_Ciso" isHorizontal="true">
-        <dc:Bounds x="190" y="740" width="2790" height="120" />
+      <bpmndi:BPMNShape id="Lane_IncidentCommander_di" bpmnElement="Lane_IncidentCommander" isHorizontal="true">
+        <dc:Bounds x="190" y="980" width="2790" height="120" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Lane_Legal_di" bpmnElement="Lane_Legal" isHorizontal="true">
         <dc:Bounds x="190" y="860" width="2790" height="120" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Lane_IncidentCommander_di" bpmnElement="Lane_IncidentCommander" isHorizontal="true">
-        <dc:Bounds x="190" y="980" width="2790" height="120" />
+      <bpmndi:BPMNShape id="Lane_Ciso_di" bpmnElement="Lane_Ciso" isHorizontal="true">
+        <dc:Bounds x="190" y="740" width="2790" height="120" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_ForensicsLead_di" bpmnElement="Lane_ForensicsLead" isHorizontal="true">
+        <dc:Bounds x="190" y="620" width="2790" height="120" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_SocAnalyst_di" bpmnElement="Lane_SocAnalyst" isHorizontal="true">
+        <dc:Bounds x="190" y="500" width="2790" height="120" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Automation_di" bpmnElement="Lane_Automation" isHorizontal="true">
+        <dc:Bounds x="190" y="80" width="2790" height="420" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="StartEvent_1_di" bpmnElement="StartEvent_1">
         <dc:Bounds x="232" y="272" width="36" height="36" />
@@ -469,12 +468,6 @@
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_TriageAI_di" bpmnElement="Task_TriageAI">
         <dc:Bounds x="310" y="250" width="100" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Boundary_TriageAiFailed_di" bpmnElement="Boundary_TriageAiFailed">
-        <dc:Bounds x="342" y="312" width="36" height="36" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="330" y="352" width="47" height="14" />
-        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_Triage_di" bpmnElement="Task_Triage">
         <dc:Bounds x="460" y="250" width="100" height="80" />
@@ -506,17 +499,17 @@
           <dc:Bounds x="1075" y="228" width="71" height="27" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_Notify_di" bpmnElement="Task_Notify">
-        <dc:Bounds x="1210" y="250" width="100" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="AdHoc_ResponseActions_di" bpmnElement="AdHoc_ResponseActions" isExpanded="false">
-        <dc:Bounds x="1210" y="380" width="100" height="80" />
-      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="SubProcess_Containment_di" bpmnElement="SubProcess_Containment" isExpanded="false">
         <dc:Bounds x="1210" y="520" width="100" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="SubProcess_Forensics_di" bpmnElement="SubProcess_Forensics" isExpanded="false">
         <dc:Bounds x="1210" y="640" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Notify_di" bpmnElement="Task_Notify">
+        <dc:Bounds x="1210" y="250" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AdHoc_ResponseActions_di" bpmnElement="AdHoc_ResponseActions" isExpanded="false">
+        <dc:Bounds x="1210" y="380" width="100" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Gateway_Join_di" bpmnElement="Gateway_Join">
         <dc:Bounds x="1385" y="265" width="50" height="50" />
@@ -526,12 +519,6 @@
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_CisoReview_di" bpmnElement="Task_CisoReview">
         <dc:Bounds x="1510" y="760" width="100" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Boundary_CisoSla_di" bpmnElement="Boundary_CisoSla">
-        <dc:Bounds x="1542" y="822" width="36" height="36" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="1478" y="833" width="59" height="14" />
-        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_EscalateSla_di" bpmnElement="Task_EscalateSla">
         <dc:Bounds x="1510" y="380" width="100" height="80" />
@@ -557,35 +544,14 @@
       <bpmndi:BPMNShape id="Task_FileRegNotification_di" bpmnElement="Task_FileRegNotification">
         <dc:Bounds x="2110" y="880" width="100" height="80" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Boundary_Reg72h_di" bpmnElement="Boundary_Reg72h">
-        <dc:Bounds x="2142" y="942" width="36" height="36" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="2074" y="953" width="65" height="14" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_EscalateCiso_di" bpmnElement="Task_EscalateCiso">
         <dc:Bounds x="2110" y="380" width="100" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="End_RegEscalated_di" bpmnElement="End_RegEscalated">
-        <dc:Bounds x="2442" y="402" width="36" height="36" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="2419" y="445" width="83" height="14" />
-        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Gateway_RegMerge_di" bpmnElement="Gateway_RegMerge" isMarkerVisible="true">
         <dc:Bounds x="2285" y="265" width="50" height="50" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_ReportAI_di" bpmnElement="Task_ReportAI">
         <dc:Bounds x="2410" y="250" width="100" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Boundary_ReportAiFailed_di" bpmnElement="Boundary_ReportAiFailed">
-        <dc:Bounds x="2442" y="312" width="36" height="36" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="2430" y="352" width="47" height="14" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_Report_di" bpmnElement="Task_Report">
-        <dc:Bounds x="2560" y="120" width="100" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_Closure_di" bpmnElement="Task_Closure">
         <dc:Bounds x="2560" y="1000" width="100" height="80" />
@@ -599,6 +565,39 @@
           <dc:Bounds x="2891" y="315" width="38" height="14" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Report_di" bpmnElement="Task_Report">
+        <dc:Bounds x="2580" y="140" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_RegEscalated_di" bpmnElement="End_RegEscalated">
+        <dc:Bounds x="2232" y="402" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2227" y="445" width="48" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Boundary_CisoSla_di" bpmnElement="Boundary_CisoSla">
+        <dc:Bounds x="1542" y="742" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1571" y="713" width="58" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Boundary_Reg72h_di" bpmnElement="Boundary_Reg72h">
+        <dc:Bounds x="2142" y="862" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2168" y="833" width="64" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Boundary_ReportAiFailed_di" bpmnElement="Boundary_ReportAiFailed">
+        <dc:Bounds x="2442" y="232" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2400" y="203" width="40" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Boundary_TriageAiFailed_di" bpmnElement="Boundary_TriageAiFailed">
+        <dc:Bounds x="342" y="312" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="300" y="363" width="40" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="Flow_start_triageai_di" bpmnElement="Flow_start_triageai">
         <di:waypoint x="268" y="290" />
         <di:waypoint x="310" y="290" />
@@ -609,10 +608,9 @@
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_triageaifail_worker_di" bpmnElement="Flow_triageaifail_worker">
         <di:waypoint x="360" y="348" />
-        <di:waypoint x="360" y="362" />
-        <di:waypoint x="435" y="362" />
-        <di:waypoint x="435" y="290" />
-        <di:waypoint x="460" y="290" />
+        <di:waypoint x="360" y="400" />
+        <di:waypoint x="510" y="400" />
+        <di:waypoint x="510" y="330" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_triage_classify_di" bpmnElement="Flow_triage_classify">
         <di:waypoint x="560" y="290" />
@@ -644,15 +642,6 @@
           <dc:Bounds x="1016" y="266" width="35" height="14" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_split_notify_di" bpmnElement="Flow_split_notify">
-        <di:waypoint x="1135" y="290" />
-        <di:waypoint x="1210" y="290" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_split_adhoc_di" bpmnElement="Flow_split_adhoc">
-        <di:waypoint x="1110" y="315" />
-        <di:waypoint x="1110" y="420" />
-        <di:waypoint x="1210" y="420" />
-      </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_split_containment_di" bpmnElement="Flow_split_containment">
         <di:waypoint x="1110" y="315" />
         <di:waypoint x="1110" y="560" />
@@ -663,38 +652,43 @@
         <di:waypoint x="1110" y="680" />
         <di:waypoint x="1210" y="680" />
       </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_split_notify_di" bpmnElement="Flow_split_notify">
+        <di:waypoint x="1135" y="290" />
+        <di:waypoint x="1210" y="290" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_split_adhoc_di" bpmnElement="Flow_split_adhoc">
+        <di:waypoint x="1110" y="315" />
+        <di:waypoint x="1110" y="420" />
+        <di:waypoint x="1210" y="420" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_containment_join_di" bpmnElement="Flow_containment_join">
+        <di:waypoint x="1310" y="560" />
+        <di:waypoint x="1410" y="560" />
+        <di:waypoint x="1410" y="315" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_forensics_join_di" bpmnElement="Flow_forensics_join">
+        <di:waypoint x="1310" y="680" />
+        <di:waypoint x="1430" y="680" />
+        <di:waypoint x="1430" y="295" />
+      </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_notify_join_di" bpmnElement="Flow_notify_join">
         <di:waypoint x="1310" y="290" />
         <di:waypoint x="1385" y="290" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_adhoc_join_di" bpmnElement="Flow_adhoc_join">
         <di:waypoint x="1310" y="420" />
-        <di:waypoint x="1360" y="420" />
-        <di:waypoint x="1360" y="290" />
-        <di:waypoint x="1385" y="290" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_containment_join_di" bpmnElement="Flow_containment_join">
-        <di:waypoint x="1310" y="560" />
-        <di:waypoint x="1345" y="560" />
-        <di:waypoint x="1345" y="290" />
-        <di:waypoint x="1385" y="290" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_forensics_join_di" bpmnElement="Flow_forensics_join">
-        <di:waypoint x="1310" y="680" />
-        <di:waypoint x="1330" y="680" />
-        <di:waypoint x="1330" y="290" />
-        <di:waypoint x="1385" y="290" />
+        <di:waypoint x="1390" y="420" />
+        <di:waypoint x="1390" y="295" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_join_ciso_di" bpmnElement="Flow_join_ciso">
-        <di:waypoint x="1410" y="315" />
-        <di:waypoint x="1410" y="800" />
+        <di:waypoint x="1435" y="290" />
+        <di:waypoint x="1460" y="290" />
+        <di:waypoint x="1460" y="800" />
         <di:waypoint x="1510" y="800" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_sla_escalate_di" bpmnElement="Flow_sla_escalate">
-        <di:waypoint x="1542" y="840" />
-        <di:waypoint x="1490" y="840" />
-        <di:waypoint x="1490" y="420" />
-        <di:waypoint x="1510" y="420" />
+        <di:waypoint x="1560" y="742" />
+        <di:waypoint x="1560" y="460" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_slaescalate_end_di" bpmnElement="Flow_slaescalate_end">
         <di:waypoint x="1610" y="420" />
@@ -737,35 +731,30 @@
         <di:waypoint x="2310" y="315" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_reg72_escalate_di" bpmnElement="Flow_reg72_escalate">
-        <di:waypoint x="2142" y="960" />
-        <di:waypoint x="2085" y="960" />
-        <di:waypoint x="2085" y="420" />
-        <di:waypoint x="2110" y="420" />
+        <di:waypoint x="2160" y="862" />
+        <di:waypoint x="2160" y="460" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_regescalate_end_di" bpmnElement="Flow_regescalate_end">
         <di:waypoint x="2210" y="420" />
-        <di:waypoint x="2442" y="420" />
+        <di:waypoint x="2232" y="420" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_regmerge_reportai_di" bpmnElement="Flow_regmerge_reportai">
         <di:waypoint x="2335" y="290" />
         <di:waypoint x="2410" y="290" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_reportaifail_fallback_di" bpmnElement="Flow_reportaifail_fallback">
-        <di:waypoint x="2460" y="348" />
-        <di:waypoint x="2460" y="362" />
-        <di:waypoint x="2530" y="362" />
-        <di:waypoint x="2530" y="160" />
-        <di:waypoint x="2560" y="160" />
-      </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_reportai_closure_di" bpmnElement="Flow_reportai_closure">
         <di:waypoint x="2510" y="290" />
-        <di:waypoint x="2535" y="290" />
-        <di:waypoint x="2535" y="1040" />
-        <di:waypoint x="2560" y="1040" />
+        <di:waypoint x="2570" y="290" />
+        <di:waypoint x="2570" y="1000" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_reportaifail_fallback_di" bpmnElement="Flow_reportaifail_fallback">
+        <di:waypoint x="2460" y="232" />
+        <di:waypoint x="2460" y="180" />
+        <di:waypoint x="2580" y="180" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_reportfallback_closure_di" bpmnElement="Flow_reportfallback_closure">
-        <di:waypoint x="2610" y="200" />
-        <di:waypoint x="2610" y="1000" />
+        <di:waypoint x="2630" y="220" />
+        <di:waypoint x="2630" y="1000" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_closure_close_di" bpmnElement="Flow_closure_close">
         <di:waypoint x="2660" y="1040" />
@@ -779,8 +768,6 @@
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
-  <!-- Collapsed sub-processes need their own plane, otherwise the children get drawn on the root
-       plane and land on top of the main flow. -->
   <bpmndi:BPMNDiagram id="BPMNDiagram_Containment">
     <bpmndi:BPMNPlane id="BPMNPlane_Containment" bpmnElement="SubProcess_Containment">
       <bpmndi:BPMNShape id="Cont_Start_di" bpmnElement="Cont_Start">
@@ -788,12 +775,6 @@
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_Isolate_di" bpmnElement="Task_Isolate">
         <dc:Bounds x="240" y="110" width="100" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Boundary_IsolationFailed_di" bpmnElement="Boundary_IsolationFailed">
-        <dc:Bounds x="272" y="172" width="36" height="36" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="197" y="183" width="72" height="14" />
-        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_HandleIsoFail_di" bpmnElement="Task_HandleIsoFail">
         <dc:Bounds x="390" y="250" width="100" height="80" />
@@ -803,6 +784,12 @@
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Cont_End_di" bpmnElement="Cont_End">
         <dc:Bounds x="722" y="132" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Boundary_IsolationFailed_di" bpmnElement="Boundary_IsolationFailed">
+        <dc:Bounds x="272" y="172" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="197" y="183" width="72" height="14" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="Flow_cont_start_isolate_di" bpmnElement="Flow_cont_start_isolate">
         <di:waypoint x="188" y="150" />
