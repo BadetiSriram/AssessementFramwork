@@ -26,6 +26,17 @@ Import `incident-response-service.postman_collection.json` into Postman
 To try the exception path, start with **Raise incident (isolation-failure path)** instead — the
 first task becomes **Handle Isolation Failure** (Incident Commander).
 
+## Classification variants (request-driven DMN)
+The triage signals are optional fields on `POST /incidents` and steer the Incident Classification
+DMN, so you can demo every severity path:
+- **Raise incident (P1 happy path)** — no signals → defaults to **P1** (full response).
+- **Raise incident (P4 - false positive, auto-close)** — `attackConfirmed:false` → **P4** → the
+  incident **auto-closes** (status `AUTO_CLOSED`), no human tasks. Confirm with **Get incident**.
+- **Raise incident (P2 - contained, no data loss)** — `assetCriticality:"HIGH", dataExposed:false`
+  → **P2**; drive it to CLOSED via the human tasks. Because `dataExposed=false`, the Regulatory
+  Notification DMN returns false and the **File Regulatory Notification** task is skipped.
+- (Send `assetCriticality:"MEDIUM"` for **P3**.)
+
 ## Notes
 - The complete-task requests send a **superset of form fields**; extra fields are ignored by Camunda,
   so the same body works for every task.

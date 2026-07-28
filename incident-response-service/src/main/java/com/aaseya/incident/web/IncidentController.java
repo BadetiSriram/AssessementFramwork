@@ -36,7 +36,10 @@ public class IncidentController {
     @ResponseStatus(HttpStatus.CREATED)
     public Response<IncidentDto> raise(@Valid @RequestBody RaiseIncidentRequest request) {
         boolean force = Boolean.TRUE.equals(request.forceIsolationFailure());
-        Incident incident = incidentService.raiseIncident(request.title(), request.source(), force);
+        Incident incident = incidentService.raiseIncident(
+                request.title(), request.source(), force,
+                request.attackConfirmed(), request.assetCriticality(),
+                request.dataExposed(), request.recordCount());
         return Response.ok(IncidentDto.from(incident));
     }
 

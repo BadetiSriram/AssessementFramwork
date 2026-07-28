@@ -38,7 +38,14 @@ mvn spring-boot:run "-Dspring-boot.run.profiles=local"
 
 **Trigger a process**
 ```powershell
+# Default -> classifies P1 (full response, waits at the human tasks)
 curl -X POST http://localhost:8080/incidents -H "Content-Type: application/json" -d "{\"title\":\"Ransomware on prod-db\",\"source\":\"SIEM\"}"
+
+# Request-driven DMN variants (steer the classification):
+#   P4 false positive -> auto-closes, no human tasks
+curl -X POST http://localhost:8080/incidents -H "Content-Type: application/json" -d "{\"title\":\"Benign alert\",\"source\":\"SIEM\",\"attackConfirmed\":false}"
+#   P2 contained, no data loss -> regulatory branch skipped
+curl -X POST http://localhost:8080/incidents -H "Content-Type: application/json" -d "{\"title\":\"Contained breach\",\"source\":\"SIEM\",\"assetCriticality\":\"HIGH\",\"dataExposed\":false}"
 ```
 
 ---
@@ -53,7 +60,13 @@ curl -X POST http://localhost:8080/incidents -H "Content-Type: application/json"
   user tasks).
 - **Start variables handed to Camunda:** `businessKey` (= incidentId), `incidentId`, `title`,
   `source`, `forceIsolationFailure` (default false), `triageReport` (""), `responseActions`
-  (`["Task_BlockIp","Task_RevokeCredentials"]`), `triageAgent` ({}), `reportAgent` ({}).
+  (`["Task_BlockIp","Task_RevokeCredentials"]`), `triageAgent` ({}), `reportAgent` ({}), and the
+  **triage signals that drive the DMNs** — `attackConfirmed` (default `true`), `assetCriticality`
+  (default `"HIGH"`), `dataExposed` (default `true`), `recordCount` (default `25000`). These are
+  **request-driven**: supply any of them on `POST /incidents` to steer the classification
+  (e.g. `attackConfirmed:false` → P4 auto-close; `assetCriticality:"HIGH", dataExposed:false` → P2;
+  `assetCriticality:"MEDIUM"` → P3). Omitted → the P1 defaults above. In production these would come
+  from the AI triage / enrichment step.
 
 Every worker below is **idempotent** — it reads `businessKey` and the framework's `IdempotencyGuard`
 silently skips duplicate re-deliveries.
@@ -63,8 +76,8 @@ silently skips duplicate re-deliveries.
 | # | BPMN element | Type | Worker class / decision | What it does | Variables it writes |
 |---|---|---|---|---|---|
 | 1 | **AI Threat Triage** (`Task_TriageAI`) | AI Agent connector (OpenAI `gpt-4o-mini`) | — | Prompts the LLM with `title`+`source` for a triage summary. On failure → BPMN error → boundary → step 2 | `triageReport` (LLM text) |
-| 2 | **Record Triage / Set DMN Inputs** (`Task_Triage`) | job worker `triage-threat` | `TriageWorker` | Domain: **RAISED → TRIAGED**. Sets the signals the classification DMN needs | `attackConfirmed=true`, `assetCriticality="HIGH"`, `dataExposed=true`, `recordCount=25000` |
-| 3 | **Classify Incident** (`Task_Classify`) | DMN business rule task | decision `incident-classification` (hit policy FIRST) | Reads `attackConfirmed/assetCriticality/dataExposed` → severity | `severity` (e.g. **"P1"**) |
+| 2 | **Record Triage** (`Task_Triage`) | job worker `triage-threat` | `TriageWorker` | Domain: **RAISED → TRIAGED**. The DMN input signals come from the start variables (request-driven), so this worker only advances domain state | — |
+| 3 | **Classify Incident** (`Task_Classify`) | DMN business rule task | decision `incident-classification` (hit policy FIRST) | Reads `attackConfirmed/assetCriticality/dataExposed` (from the request/start vars) → severity | `severity` (**P1**/P2/P3/P4) |
 | 4 | **Record Classification** (`Task_RecordClass`) | job worker `record-classification` | `RecordClassificationWorker` | Domain: **TRIAGED → CLASSIFIED**, saves severity; derives the SLA | `slaDuration` (P1→`PT4H`, P2→`PT8H`, P3→`PT24H`) |
 | 5 | **P4 / false positive?** (`Gateway_P4`) | exclusive gateway | — | If `severity="P4"` → step 5a; else → parallel split (step 6) | — |
 | 5a | **Auto Close (P4)** (`Task_AutoClose`) | job worker `auto-close` | `AutoCloseWorker` | Domain: **→ AUTO_CLOSED**. Ends at "Auto-closed" | — |

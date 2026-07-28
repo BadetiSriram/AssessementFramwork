@@ -160,6 +160,96 @@
             "description": "Exception path: automated isolation fails -> BPMN error -> escalates to the Incident Commander ('Handle Isolation Failure' task). Saves {{incidentId}}."
           },
           "response": []
+        },
+        {
+          "name": "Raise incident (P4 - false positive, auto-close)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set('incidentId', j.data.id);",
+                  "console.log('incidentId =', j.data.id, '(expect severity P4 -> AUTO_CLOSED, no human tasks)');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Benign alert - false positive\",\n  \"source\": \"SIEM\",\n  \"attackConfirmed\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents"
+              ]
+            },
+            "description": "Request-driven DMN: attackConfirmed=false -> the Incident Classification DMN returns P4 -> the P4 gateway auto-closes the incident (status AUTO_CLOSED). No parallel branches, no human tasks. Verify with 'Get incident'."
+          },
+          "response": []
+        },
+        {
+          "name": "Raise incident (P2 - contained, no data loss)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set('incidentId', j.data.id);",
+                  "console.log('incidentId =', j.data.id, '(expect severity P2; regulatory branch skipped since dataExposed=false)');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Contained breach, no data exfiltration\",\n  \"source\": \"SIEM\",\n  \"attackConfirmed\": true,\n  \"assetCriticality\": \"HIGH\",\n  \"dataExposed\": false,\n  \"recordCount\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents"
+              ]
+            },
+            "description": "Request-driven DMN: HIGH criticality but no data exposed -> severity P2 (full response, drive it to CLOSED via the human tasks). The Regulatory Notification DMN returns false (dataExposed=false), so the 'File Regulatory Notification' task is skipped. Saves {{incidentId}}."
+          },
+          "response": []
         }
       ]
     },

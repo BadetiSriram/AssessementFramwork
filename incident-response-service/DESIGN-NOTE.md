@@ -28,9 +28,11 @@ gateway chain.
 Two decision tables, both **hit policy FIRST**, invoked from business rule tasks
 (`zeebe:calledDecision`, result mapped to a process variable):
 
-- **Incident Classification** — inputs `attackConfirmed`, `assetCriticality`, `dataExposed` (produced
-  by the AI triage step); output `severity` (P1–P4). Rules are ordered by precedence: false-positive
-  first (→ P4, auto-closed), then most-severe downward. Severity drives the downstream SLA timer.
+- **Incident Classification** — inputs `attackConfirmed`, `assetCriticality`, `dataExposed`; output
+  `severity` (P1–P4). Rules are ordered by precedence: false-positive first (→ P4, auto-closed), then
+  most-severe downward. Severity drives the downstream SLA timer. The inputs are **request-driven**
+  process variables (supplied on `POST /incidents`, defaulting to a high-severity P1); in production
+  they would be populated by the AI triage / enrichment step rather than the caller.
 - **Regulatory Notification Required** — inputs `dataExposed`, `recordCount`; output
   `regulatoryRequired` (boolean).
 
