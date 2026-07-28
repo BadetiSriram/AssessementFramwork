@@ -1,0 +1,30 @@
+{
+  "type": "default",
+  "id": "file-regulatory-notification-form",
+  "schemaVersion": 18,
+  "components": [
+    {
+      "type": "text",
+      "id": "reg_intro",
+      "text": "## File Regulatory Notification\nFile the required regulatory and customer notifications within the 72-hour deadline."
+    },
+    {
+      "type": "textarea",
+      "id": "reg_jurisdictions",
+      "key": "jurisdictions",
+      "label": "Jurisdictions notified"
+    },
+    {
+      "type": "checkbox",
+      "id": "reg_filed",
+      "key": "notificationFiled",
+      "label": "Notifications filed"
+    },
+    {
+      "type": "textarea",
+      "id": "reg_details",
+      "key": "notificationDetails",
+      "label": "Details"
+    }
+  ]
+}

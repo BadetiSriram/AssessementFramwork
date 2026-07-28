@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
+             id="incident-decisions"
+             name="Incident Decisions"
+             namespace="http://camunda.org/schema/1.0/dmn">
+  <!--
+    Incident Classification (P1-P4) from the AI triage output.
+    Inputs come from the triage step's process variables; the business rule task stores the
+    result in the `severity` process variable.
+    Hit policy FIRST: rules are evaluated top-to-bottom and the first match wins, so the
+    order encodes precedence (false-positive first, then most-severe downwards).
+  -->
+  <decision id="incident-classification" name="Incident Classification">
+    <decisionTable id="incident-classification-table" hitPolicy="FIRST">
+      <input id="input_attack" label="Attack Confirmed">
+        <inputExpression id="inputExpr_attack" typeRef="boolean">
+          <text>attackConfirmed</text>
+        </inputExpression>
+      </input>
+      <input id="input_asset" label="Asset Criticality">
+        <inputExpression id="inputExpr_asset" typeRef="string">
+          <text>assetCriticality</text>
+        </inputExpression>
+      </input>
+      <input id="input_data" label="Data Exposed">
+        <inputExpression id="inputExpr_data" typeRef="boolean">
+          <text>dataExposed</text>
+        </inputExpression>
+      </input>
+      <output id="output_severity" label="Severity" name="severity" typeRef="string"/>
+
+      <rule id="rule_false_positive">
+        <inputEntry id="ie_fp_1"><text>false</text></inputEntry>
+        <inputEntry id="ie_fp_2"><text></text></inputEntry>
+        <inputEntry id="ie_fp_3"><text></text></inputEntry>
+        <outputEntry id="oe_fp"><text>"P4"</text></outputEntry>
+      </rule>
+      <rule id="rule_p1_critical">
+        <inputEntry id="ie_p1c_1"><text>true</text></inputEntry>
+        <inputEntry id="ie_p1c_2"><text>"CRITICAL"</text></inputEntry>
+        <inputEntry id="ie_p1c_3"><text></text></inputEntry>
+        <outputEntry id="oe_p1c"><text>"P1"</text></outputEntry>
+      </rule>
+      <rule id="rule_p1_high_data">
+        <inputEntry id="ie_p1h_1"><text>true</text></inputEntry>
+        <inputEntry id="ie_p1h_2"><text>"HIGH"</text></inputEntry>
+        <inputEntry id="ie_p1h_3"><text>true</text></inputEntry>
+        <outputEntry id="oe_p1h"><text>"P1"</text></outputEntry>
+      </rule>
+      <rule id="rule_p2_high">
+        <inputEntry id="ie_p2_1"><text>true</text></inputEntry>
+        <inputEntry id="ie_p2_2"><text>"HIGH"</text></inputEntry>
+        <inputEntry id="ie_p2_3"><text>false</text></inputEntry>
+        <outputEntry id="oe_p2"><text>"P2"</text></outputEntry>
+      </rule>
+      <rule id="rule_p3_medium">
+        <inputEntry id="ie_p3_1"><text>true</text></inputEntry>
+        <inputEntry id="ie_p3_2"><text>"MEDIUM"</text></inputEntry>
+        <inputEntry id="ie_p3_3"><text></text></inputEntry>
+        <outputEntry id="oe_p3"><text>"P3"</text></outputEntry>
+      </rule>
+      <rule id="rule_default">
+        <inputEntry id="ie_d_1"><text></text></inputEntry>
+        <inputEntry id="ie_d_2"><text></text></inputEntry>
+        <inputEntry id="ie_d_3"><text></text></inputEntry>
+        <outputEntry id="oe_d"><text>"P3"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

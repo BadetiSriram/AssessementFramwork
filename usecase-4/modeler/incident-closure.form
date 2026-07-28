@@ -1,0 +1,24 @@
+{
+  "type": "default",
+  "id": "incident-closure-form",
+  "schemaVersion": 18,
+  "components": [
+    {
+      "type": "text",
+      "id": "cl_intro",
+      "text": "## Incident Closure\nReview the post-incident report and formally close the incident."
+    },
+    {
+      "type": "checkbox",
+      "id": "cl_lessons",
+      "key": "lessonsLearnedCaptured",
+      "label": "Lessons learned captured"
+    },
+    {
+      "type": "textarea",
+      "id": "cl_notes",
+      "key": "closureNotes",
+      "label": "Closure notes"
+    }
+  ]
+}

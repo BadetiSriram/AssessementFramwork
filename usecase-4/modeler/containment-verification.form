@@ -1,0 +1,24 @@
+{
+  "type": "default",
+  "id": "containment-verification-form",
+  "schemaVersion": 18,
+  "components": [
+    {
+      "type": "text",
+      "id": "cv_intro",
+      "text": "## Containment Verification\nConfirm the affected systems have been isolated."
+    },
+    {
+      "type": "checkbox",
+      "id": "cv_verified",
+      "key": "containmentVerified",
+      "label": "Containment verified"
+    },
+    {
+      "type": "textarea",
+      "id": "cv_notes",
+      "key": "containmentNotes",
+      "label": "Verification notes"
+    }
+  ]
+}

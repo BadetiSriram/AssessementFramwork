@@ -1,0 +1,24 @@
+{
+  "type": "default",
+  "id": "integrity-verification-form",
+  "schemaVersion": 18,
+  "components": [
+    {
+      "type": "text",
+      "id": "iv_intro",
+      "text": "## System Integrity Verification\nVerify restored systems are clean and healthy before closure."
+    },
+    {
+      "type": "checkbox",
+      "id": "iv_verified",
+      "key": "integrityVerified",
+      "label": "System integrity verified"
+    },
+    {
+      "type": "textarea",
+      "id": "iv_notes",
+      "key": "integrityNotes",
+      "label": "Verification notes"
+    }
+  ]
+}

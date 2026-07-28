@@ -1,0 +1,25 @@
+{
+  "type": "default",
+  "id": "forensic-analysis-form",
+  "schemaVersion": 18,
+  "components": [
+    {
+      "type": "text",
+      "id": "fa_intro",
+      "text": "## Forensic Analysis\nAnalyze the collected evidence; establish scope and root cause."
+    },
+    {
+      "type": "textarea",
+      "id": "fa_rootcause",
+      "key": "rootCause",
+      "label": "Root cause",
+      "validate": { "required": true }
+    },
+    {
+      "type": "textarea",
+      "id": "fa_scope",
+      "key": "impactScope",
+      "label": "Scope / impacted assets"
+    }
+  ]
+}

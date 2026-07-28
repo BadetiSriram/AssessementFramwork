@@ -1,0 +1,30 @@
+{
+  "type": "default",
+  "id": "ciso-review-form",
+  "schemaVersion": 18,
+  "components": [
+    {
+      "type": "text",
+      "id": "ciso_intro",
+      "text": "## CISO Review\nReview the consolidated incident file, accept residual risk, and authorize recovery."
+    },
+    {
+      "type": "checkbox",
+      "id": "ciso_residual",
+      "key": "residualRiskAccepted",
+      "label": "Residual risk accepted"
+    },
+    {
+      "type": "checkbox",
+      "id": "ciso_authorize",
+      "key": "recoveryAuthorized",
+      "label": "Recovery authorized"
+    },
+    {
+      "type": "textarea",
+      "id": "ciso_notes",
+      "key": "cisoNotes",
+      "label": "CISO notes"
+    }
+  ]
+}
