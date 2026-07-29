@@ -7,6 +7,10 @@ Set `baseUrl` under the collection's Variables tab if you're not on `http://loca
 the backend, and keep the Postman console open (View → Show Postman Console) - the test scripts log
 incident ids, task names and status there.
 
+**[POSTMAN-RUN.md](POSTMAN-RUN.md) is the run-book**: ten scenarios, step by step, with the exact
+request to hit, why each input is what it is, and the verified output. Start there if you're driving
+a demo. This file is the reference for what's in the collection.
+
 ## Folders
 
 | | |
@@ -17,6 +21,7 @@ incident ids, task names and status there.
 | 3 | list / complete tasks, with one shared body |
 | 4 | the same, but with each task's real form fields |
 | 5 | validation and business errors |
+| 6 | boundary events, escalation timers, ad-hoc variants |
 
 ## Happy path
 
@@ -56,12 +61,68 @@ DMNs; omit them and you get `true / HIGH / true / 25000`.
 Those last two DMN rows are the pair worth showing: severity and "does Legal have to file" are
 separate decisions, so the under-threshold request stays P1 while still skipping the filing task.
 
+## Boundary events and timers (folder 6)
+
+The model has five boundary events. Waiting for the real ones means an LLM outage and a 72-hour
+clock, so `POST /incidents` takes a few override fields that make each one reachable in a demo.
+
+| Boundary | On | Field | Effect |
+| --- | --- | --- | --- |
+| Isolation Failed (error) | Isolate Systems | `forceIsolationFailure:true` | commander gets Handle Isolation Failure |
+| AI failed (error) | AI Threat Triage | `forceAiFailure:true` | falls back to the triage worker |
+| AI failed (error) | AI Post-Incident Report | `forceAiFailure:true` | falls back to the generate-report worker |
+| SLA breach (timer) | CISO Review | `slaDuration:"PT20S"` | escalation instead of the severity default (P1 PT4H) |
+| 72h deadline (timer) | File Regulatory Notification | `regulatoryDeadline:"PT20S"` | escalation instead of PT72H |
+
+`forceAiFailure` points the AI Agent tasks at a model id OpenAI rejects, so the connector really
+fails and `errorExpression` really raises `AI_STEP_FAILED` - it's not a stubbed flag. Both timers
+are non-interrupting: the user task stays open and you complete it as normal afterwards.
+
+`responseActions` picks which ad-hoc actions the commander activates - any subset of
+`Task_BlockIp`, `Task_RevokeCredentials`, `Task_DeployPatch`. The default is the first two, so pass
+all three if you want Deploy Patch to run.
+
+Everything automated lands in `GET /incidents/{id}/tasks/outcomes` with `completedBy` set to
+`system:process` and `userTaskKey` 0, next to the human completions. "Verify boundary & timer
+events" reads that back and asserts on it. The isolation-failure boundary is the exception: it
+produces a real user task, so it shows as a human row.
+
+"Every boundary event in one run" does all five on a single incident and still reaches CLOSED,
+which is the point - none of these failures stop the process.
+
 ## Errors
 
-- Missing or blank `title`/`source` → 400 with a `fieldErrors` array.
-- Unknown incident id, on the incident or the task endpoints → 422, `INCIDENT_NOT_FOUND`.
-- `POST .../tasks/complete` with nothing open → 422 `NO_ACTIVE_TASK`; with two open (the parallel
-  phase) → 422 `AMBIGUOUS_TASK`, complete by `userTaskKey` instead.
+14 negative tests in folder 5, all verified against a running service.
+
+Bean validation → **400** with a `fieldErrors` array:
+
+- missing or blank `title`/`source`
+- `assetCriticality` outside LOW/MEDIUM/HIGH/CRITICAL - otherwise it falls through to the DMN's
+  catch-all rule and comes back P3, which reads like the table is wrong rather than the request
+- negative `recordCount`
+- `slaDuration` / `regulatoryDeadline` that aren't ISO-8601 - these become BPMN timer expressions,
+  so a bad one fails the process instance minutes later instead of failing the request
+- an entry in `responseActions` that isn't one of the three ad-hoc element ids; the error names the
+  index, e.g. `responseActions[1]`
+
+Business errors → **422** with a stable `errorCode`:
+
+- `INCIDENT_NOT_FOUND` - unknown incident id, on the incident or the task endpoints
+- `NO_ACTIVE_TASK` / `AMBIGUOUS_TASK` - `POST .../tasks/complete` with nothing open, or with two
+  open during the parallel phase (complete by `userTaskKey` instead)
+- `USER_TASK_NOT_FOUND` - a `userTaskKey` that doesn't exist or was already completed
+
+Unparseable input → **400** with `rejectedValue`:
+
+- malformed JSON body, or a field of the wrong type (`"recordCount": "lots"`)
+- a path id that isn't a UUID - distinct from a well-formed UUID that doesn't exist, which is 422
+
+Those last three used to come back as **500 "An unexpected error occurred."** The framework's
+handler covers validation and its own exception types, but Jackson parse failures and path-variable
+conversion failures fell through to its `Exception` catch-all. `IncidentWebExceptionHandler` is
+ordered ahead of it and claims those two types; the Camunda 404 is translated in
+`CamundaTaskAdapter`, which keeps the Camunda client inside `infrastructure.camunda` where the
+ArchUnit rule requires it.
 
 Successful responses are wrapped as `{"data": ..., "meta": {...}}`, which is why the test scripts
 all read `data`.

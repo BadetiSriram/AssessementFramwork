@@ -68,7 +68,7 @@ flowchart TD
     integ --> reg["Regulatory Required? - DMN regulatory-notification"]:::dmn
     reg --> reggw{"Regulatory required?"}:::gw
     reggw -- "yes" --> fileReg["File Regulatory Notification - 👤 legal-compliance"]:::ut
-    fileReg -. "72h timer PT72H" .-> escCiso["Escalate to CISO - worker escalate"]:::wk
+    fileReg -. "72h timer =regulatoryDeadline" .-> escCiso["Escalate to CISO - worker escalate"]:::wk
     escCiso --> endReg(["Deadline escalated"]):::ev
     reggw -- "no" --> merge{"Merge"}:::gw
     fileReg --> merge
@@ -116,7 +116,8 @@ sub-processes, 7 forms, 5 personas, 2 BPMN errors, 2 escalation timers.
 ## Status machine
 
 `RAISED → TRIAGED → CLASSIFIED → RECOVERING → CLOSED`, or straight to `AUTO_CLOSED` on P4.
-SLA by severity: P1 PT4H, P2 PT8H, P3 PT24H. Regulatory deadline is a flat PT72H.
+SLA by severity: P1 PT4H, P2 PT8H, P3 PT24H. Regulatory deadline defaults to PT72H. Both are
+process variables (`slaDuration`, `regulatoryDeadline`), so a demo can override them to seconds.
 
 ## Personas
 
@@ -124,9 +125,17 @@ SLA by severity: P1 PT4H, P2 PT8H, P3 PT24H. Regulatory deadline is a flat PT72H
 
 ## Exception paths worth showing
 
+All five are reachable from the raise body, and every automated one leaves a `system:process` row in
+`GET /incidents/{id}/tasks/outcomes`.
+
 - `forceIsolationFailure:true` - isolation throws a BPMN error, commander gets Handle Isolation Failure.
+- `forceAiFailure:true` - both AI Agent tasks get a model id OpenAI rejects, so both error
+  boundaries fire and both fall back to workers. The incident still reaches CLOSED.
+- `slaDuration:"PT20S"` - trips the CISO review SLA timer without waiting 4 hours.
+- `regulatoryDeadline:"PT20S"` - trips the 72h timer on the regulatory task. Non-interrupting, so
+  Legal keeps the task; the escalation just tells the CISO the clock ran out.
 - `attackConfirmed:false` - DMN says P4, auto-closes, no human tasks at all.
-- The 72h timer on the regulatory task escalates to the CISO without cancelling the task.
+- `responseActions:[...]` - which ad-hoc actions run; pass all three to include Deploy Patch.
 
 ## If they ask why
 
