@@ -1,12 +1,15 @@
 package com.aaseya.incident.infrastructure.camunda;
 
+import com.aaseya.camunda.framework.core.exception.BusinessException;
 import com.aaseya.incident.web.dto.UserTaskView;
 import io.camunda.client.CamundaClient;
+import io.camunda.client.api.command.ProblemException;
 import io.camunda.client.api.search.enums.UserTaskState;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletionException;
 
 /**
  * Everything we need from {@link CamundaClient} for user tasks. Kept in one place so nothing
@@ -51,10 +54,30 @@ public class CamundaTaskAdapter {
         return List.of();
     }
 
+    /**
+     * A key that doesn't exist, or one that was already completed, comes back as a 404 from the
+     * engine. That's the caller's mistake, not ours, so translate it here rather than let a
+     * Camunda exception escape the adapter and surface as a 500.
+     */
     public void completeUserTask(long userTaskKey, Map<String, Object> variables) {
-        camunda.newCompleteUserTaskCommand(userTaskKey)
-                .variables(variables == null ? Map.of() : variables)
-                .send().join();
+        try {
+            camunda.newCompleteUserTaskCommand(userTaskKey)
+                    .variables(variables == null ? Map.of() : variables)
+                    .send().join();
+        } catch (CompletionException e) {
+            throw translate(userTaskKey, e.getCause() == null ? e : e.getCause());
+        } catch (ProblemException e) {
+            throw translate(userTaskKey, e);
+        }
+    }
+
+    private static RuntimeException translate(long userTaskKey, Throwable cause) {
+        if (cause instanceof ProblemException pe && pe.code() == 404) {
+            return new BusinessException("USER_TASK_NOT_FOUND",
+                    "No active user task with key " + userTaskKey
+                            + " (wrong key, or it was already completed)");
+        }
+        return cause instanceof RuntimeException re ? re : new IllegalStateException(cause);
     }
 
     private static void sleep(long ms) {
