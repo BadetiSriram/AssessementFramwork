@@ -2,6 +2,7 @@ package com.aaseya.incident.web;
 
 import com.aaseya.camunda.framework.starter.web.Response;
 import com.aaseya.incident.application.IncidentService;
+import com.aaseya.incident.application.RaiseIncidentCommand;
 import com.aaseya.incident.domain.Incident;
 import com.aaseya.incident.web.dto.IncidentDto;
 import com.aaseya.incident.web.dto.RaiseIncidentRequest;
@@ -31,11 +32,11 @@ public class IncidentController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public Response<IncidentDto> raise(@Valid @RequestBody RaiseIncidentRequest request) {
-        boolean force = Boolean.TRUE.equals(request.forceIsolationFailure());
-        Incident incident = incidentService.raiseIncident(
-                request.title(), request.source(), force,
+        Incident incident = incidentService.raiseIncident(new RaiseIncidentCommand(
+                request.title(), request.source(), request.forceIsolationFailure(),
                 request.attackConfirmed(), request.assetCriticality(),
-                request.dataExposed(), request.recordCount());
+                request.dataExposed(), request.recordCount(), request.forceAiFailure(),
+                request.slaDuration(), request.regulatoryDeadline(), request.responseActions()));
         return Response.ok(IncidentDto.from(incident));
     }
 

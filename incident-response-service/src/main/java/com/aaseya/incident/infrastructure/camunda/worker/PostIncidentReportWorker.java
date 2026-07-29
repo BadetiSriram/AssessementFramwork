@@ -4,6 +4,7 @@ import com.aaseya.camunda.framework.core.idempotency.IdempotencyGuard;
 import com.aaseya.camunda.framework.core.worker.BaseWorker;
 import com.aaseya.camunda.framework.core.worker.VariableMapper;
 import com.aaseya.camunda.framework.core.worker.WorkResult;
+import com.aaseya.incident.application.IncidentEventService;
 import io.camunda.client.annotation.JobWorker;
 import io.camunda.client.api.response.ActivatedJob;
 import io.camunda.client.api.worker.JobClient;
@@ -19,8 +20,12 @@ import java.util.Map;
 @Component
 public class PostIncidentReportWorker extends BaseWorker<IncidentJobVars> {
 
-    public PostIncidentReportWorker(VariableMapper mapper, IdempotencyGuard guard, MeterRegistry meterRegistry) {
+    private final IncidentEventService eventService;
+
+    public PostIncidentReportWorker(VariableMapper mapper, IdempotencyGuard guard,
+                                    MeterRegistry meterRegistry, IncidentEventService eventService) {
         super(mapper, guard, meterRegistry);
+        this.eventService = eventService;
     }
 
     @Override
@@ -30,6 +35,10 @@ public class PostIncidentReportWorker extends BaseWorker<IncidentJobVars> {
 
     @Override
     protected WorkResult doWork(IncidentJobVars vars, ActivatedJob job) {
+        // Reaching this worker at all means the AI boundary fired, so it is worth recording.
+        eventService.record(vars.incidentId(), job.getElementId(),
+                "AI post-incident report fallback",
+                "{\"reason\":\"AI_STEP_FAILED\",\"fallback\":\"generate-report worker\"}");
         return WorkResult.completed(Map.of(
                 "postIncidentReport",
                 "Post-incident report for " + vars.incidentId()

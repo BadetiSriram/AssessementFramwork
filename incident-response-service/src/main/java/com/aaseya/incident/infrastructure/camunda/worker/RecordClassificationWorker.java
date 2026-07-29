@@ -34,12 +34,14 @@ public class RecordClassificationWorker extends BaseWorker<ClassificationVars> {
     protected WorkResult doWork(ClassificationVars vars, ActivatedJob job) {
         incidentService.recordClassification(vars.incidentId(), vars.severity());
         // the CISO review boundary timer reads slaDuration, so it has to be an ISO-8601 duration
-        String slaDuration = switch (vars.severity()) {
-            case "P1" -> "PT4H";
-            case "P2" -> "PT8H";
-            case "P3" -> "PT24H";
-            default   -> "PT72H";
-        };
+        String slaDuration = vars.slaOverride() != null && !vars.slaOverride().isBlank()
+                ? vars.slaOverride()
+                : switch (vars.severity()) {
+                    case "P1" -> "PT4H";
+                    case "P2" -> "PT8H";
+                    case "P3" -> "PT24H";
+                    default   -> "PT72H";
+                };
         return WorkResult.completed(Map.of("slaDuration", slaDuration));
     }
 

@@ -32,18 +32,30 @@ public class IncidentService {
         this.processService = processService;
     }
 
+    /** The model the AI Agent tasks call when we are not deliberately breaking them. */
+    static final String AI_MODEL = "gpt-4o-mini";
+
+    /** A model id OpenAI will reject, so the connector errors and the AI boundary event fires. */
+    static final String AI_MODEL_BROKEN = "gpt-4o-mini-does-not-exist";
+
+    /** Ad-hoc actions the commander runs when the caller does not pick any. */
+    static final List<String> DEFAULT_RESPONSE_ACTIONS =
+            List.of("Task_BlockIp", "Task_RevokeCredentials");
+
     /**
      * Raise an incident and kick off its response process.
      *
      * <p>The four triage signals feed the classification and regulatory DMNs. Really they should
      * come out of the AI triage step, but letting the caller pass them means we can demo any
      * severity path on demand. Anything left null falls back to a P1 that needs notification.
+     *
+     * <p>The force / override fields are the same idea applied to the failure and timer paths:
+     * they exist so a boundary event that would otherwise need a real outage or a 72-hour wait can
+     * be shown in a demo.
      */
     @Transactional
-    public Incident raiseIncident(String title, String source, boolean forceIsolationFailure,
-                                  Boolean attackConfirmed, String assetCriticality,
-                                  Boolean dataExposed, Integer recordCount) {
-        Incident incident = Incident.raise(title, source);
+    public Incident raiseIncident(RaiseIncidentCommand command) {
+        Incident incident = Incident.raise(command.title(), command.source());
         // id is already assigned, so save() merges; work with the returned instance
         Incident saved = incidentRepository.save(incident);
 
@@ -52,21 +64,37 @@ public class IncidentService {
         variables.put("incidentId", saved.getId().toString());
         variables.put("title", saved.getTitle());
         variables.put("source", saved.getSource());
-        variables.put("forceIsolationFailure", forceIsolationFailure);
+        variables.put("forceIsolationFailure", Boolean.TRUE.equals(command.forceIsolationFailure()));
         // the AI triage connector overwrites this; seed it so it exists even if that step fails
         variables.put("triageReport", "");
+        // Both AI Agent tasks read the model from here. Pointing them at a model that does not
+        // exist is the honest way to test the error boundary: the connector really calls OpenAI,
+        // really gets a 4xx, and errorExpression really raises AI_STEP_FAILED.
+        variables.put("aiModel",
+                Boolean.TRUE.equals(command.forceAiFailure()) ? AI_MODEL_BROKEN : AI_MODEL);
         // Which ad-hoc actions to activate. In real life the commander picks these as findings
         // come in; defaulting them keeps the demo running end to end.
-        variables.put("responseActions", List.of("Task_BlockIp", "Task_RevokeCredentials"));
+        variables.put("responseActions",
+                command.responseActions() != null && !command.responseActions().isEmpty()
+                        ? command.responseActions()
+                        : DEFAULT_RESPONSE_ACTIONS);
         // The AI agent tasks map =triageAgent.context / =reportAgent.context as input, and Zeebe
         // fails the job if the variable doesn't exist yet. Empty maps are enough.
         variables.put("triageAgent", Map.of());
         variables.put("reportAgent", Map.of());
-        variables.put("attackConfirmed", attackConfirmed != null ? attackConfirmed : Boolean.TRUE);
+        variables.put("attackConfirmed",
+                command.attackConfirmed() != null ? command.attackConfirmed() : Boolean.TRUE);
         variables.put("assetCriticality",
-                assetCriticality != null && !assetCriticality.isBlank() ? assetCriticality : "HIGH");
-        variables.put("dataExposed", dataExposed != null ? dataExposed : Boolean.TRUE);
-        variables.put("recordCount", recordCount != null ? recordCount : 25000);
+                command.assetCriticality() != null && !command.assetCriticality().isBlank()
+                        ? command.assetCriticality() : "HIGH");
+        variables.put("dataExposed", command.dataExposed() != null ? command.dataExposed() : Boolean.TRUE);
+        variables.put("recordCount", command.recordCount() != null ? command.recordCount() : 25000);
+        // Empty means "use the severity-derived SLA"; RecordClassificationWorker decides.
+        variables.put("slaOverride", command.slaDuration() != null ? command.slaDuration() : "");
+        // The regulatory boundary timer reads this, so a demo can use PT20S instead of PT72H.
+        variables.put("regulatoryDeadline",
+                command.regulatoryDeadline() != null && !command.regulatoryDeadline().isBlank()
+                        ? command.regulatoryDeadline() : "PT72H");
 
         long processInstanceKey = processService.start(
                 StartProcessCommand.withVariables(PROCESS_ID, saved.getBusinessKey(), variables));
