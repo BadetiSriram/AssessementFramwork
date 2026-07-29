@@ -152,7 +152,7 @@ an ad-hoc sub-process is broken in 8.9.
 | Regulatory Notification Required? (`Task_RegDecision`) | DMN business rule task | Whether we must notify regulators is a rule (data categories, record counts), not code. | Calls DMN `regulatory-notification`. | writes `regulatoryRequired` |
 | Regulatory required? (`Gateway_Reg`) | Exclusive gateway | Only file notices when the rule says so. | `true` → file notification; else skip. | reads `regulatoryRequired` |
 | File Regulatory Notification (`Task_FileRegNotification`) | User task (legal-compliance) | Legal files the notices. | Tasklist form `file-regulatory-notification-form`. | - |
-| 72h deadline (`Boundary_Reg72h`) | Non-interrupting timer boundary | The headline UC4 requirement - the 72-hour regulatory deadline with escalation. | Fixed `PT72H`; escalates to the CISO without cancelling the filing task. | - |
+| 72h deadline (`Boundary_Reg72h`) | Non-interrupting timer boundary | The headline UC4 requirement - the 72-hour regulatory deadline with escalation. | `timeDuration = =regulatoryDeadline` (`PT72H` unless the raise body shortens it); escalates to the CISO without cancelling the filing task. | reads `regulatoryDeadline` |
 | Escalate to CISO (72h) (`Task_EscalateCiso`) | Job worker `escalate` | If the deadline is at risk, the CISO is alerted. | `EscalationWorker` → separate end event. | - |
 | Regulatory merge (`Gateway_RegMerge`) | Exclusive gateway | Rejoin the "required" and "not required" paths. | Both paths continue to the report. | - |
 | AI Post-Incident Report (`Task_ReportAI`) | AI Agent connector task | UC4 requires an AI report (timeline, root cause, impact, lessons). | OpenAI; on error → `AI_STEP_FAILED`. | writes `postIncidentReport` |
@@ -411,7 +411,9 @@ Shorten the timers (PT2M or so) if you want to show this firing live in a demo.
 - **Personas → candidate groups:** SOC Analyst `soc-analyst`, Incident Commander `incident-commander`,
   Forensics Lead `forensics-lead`, CISO `ciso`, Legal/Compliance `legal-compliance`.
 - **Status machine:** `RAISED → TRIAGED → CLASSIFIED → RECOVERING → CLOSED`; early `→ AUTO_CLOSED`.
-- **SLA by severity:** P1 `PT4H`, P2 `PT8H`, P3 `PT24H`, else `PT72H`. Regulatory timer: fixed `PT72H`.
+- **SLA by severity:** P1 `PT4H`, P2 `PT8H`, P3 `PT24H`, else `PT72H`. Regulatory timer: `PT72H`.
+  Both read process variables (`slaDuration`, `regulatoryDeadline`), so the raise body can shorten
+  them to seconds for a demo.
 - **13 workers (BPMN type):** `triage-threat, record-classification, auto-close, isolate-systems,
   collect-evidence, notify-stakeholders, restore-services, close-incident, generate-report, block-ip,
   revoke-credentials, deploy-patch, escalate`.

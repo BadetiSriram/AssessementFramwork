@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "b1a7c0de-uc4-inc-resp-0001-000000000001",
     "name": "Incident Response Service (UC4)",
-    "description": "Drives the incident-response process end to end and covers every decision path.\n\nFolder 1 raises an incident, one request per classification scenario; each saves {{incidentId}}.\nFolder 3 lists and completes human tasks using one shared body (extra variables are ignored, so\nthe same body works for any task). Folder 4 has the exact form fields per task if you'd rather\ndemo it properly. Folder 5 is the error responses.\n\nHappy path: raise a P1, wait ~25-30s for the automated chain to reach the human tasks, list active\ntasks (saves {{taskKey}} and {{taskKey2}}), then complete. The parallel phase has two tasks open at\nonce so use both keys; everything after it has one, so 'Complete active task' is enough. Re-list\nbetween phases until it comes back empty, then check the incident is CLOSED.\n\nPhase order: [Containment + Forensic] -> CISO Review -> Integrity Verification -> File Regulatory\nNotification -> Incident Closure.\n\nResponses are wrapped in {\"data\":..., \"meta\":...}; errors are RFC 7807 problem details.\n{{baseUrl}} defaults to http://localhost:8080.",
+    "description": "Drives the incident-response process end to end and covers every decision path,\nevery boundary event and both escalation timers.\n\nFolder 1 raises an incident, one request per classification scenario; each saves {{incidentId}}.\nFolder 3 lists and completes human tasks using one shared body (extra variables are ignored, so\nthe same body works for any task). Folder 4 has the exact form fields per task if you'd rather\ndemo it properly. Folder 5 is the error responses. Folder 6 is the failure and timer paths: AI\nconnector failure, isolation failure, the CISO SLA timer and the 72h regulatory timer, plus the\nad-hoc action variants.\n\nHappy path: raise a P1, wait ~25-30s for the automated chain to reach the human tasks, list active\ntasks (saves {{taskKey}} and {{taskKey2}}), then complete. The parallel phase has two tasks open at\nonce so use both keys; everything after it has one, so 'Complete active task' is enough. Re-list\nbetween phases until it comes back empty, then check the incident is CLOSED.\n\nPhase order: [Containment + Forensic] -> CISO Review -> Integrity Verification -> File Regulatory\nNotification -> Incident Closure.\n\nResponses are wrapped in {\"data\":..., \"meta\":...}; errors are RFC 7807 problem details.\n{{baseUrl}} defaults to http://localhost:8080.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -420,7 +420,7 @@
                 "incidents"
               ]
             },
-            "description": "The isolate worker throws a BPMN error, the boundary event inside Containment catches it, and Handle Isolation Failure lands with the commander instead of Containment Verification."
+            "description": "The isolate worker throws a BPMN error, the boundary event inside Containment catches it, and Handle Isolation Failure lands with the commander instead of Containment Verification. This is boundary event 1 of 5; the other four are in folder 6."
           },
           "response": []
         }
@@ -1029,7 +1029,7 @@
     },
     {
       "name": "5 - Negative tests (validation & business errors)",
-      "description": "RFC 7807 problem details from the framework's exception handler: bean validation gives 400 with fieldErrors, BusinessException gives 422 with an errorCode.",
+      "description": "RFC 7807 problem details: bean validation gives 400 with fieldErrors, BusinessException gives 422 with an errorCode, and a body or path parameter the framework can't even parse gives 400 with rejectedValue.\n\nThe first block is the required fields and unknown ids. The second is the optional fields - assetCriticality, recordCount and the three demo overrides from folder 6 are all validated at the boundary, because an unparseable duration or an element id that isn't in the ad-hoc sub-process would otherwise fail the process instance minutes later instead of failing the request.",
       "item": [
         {
           "name": "Raise without title -> 400",
@@ -1238,6 +1238,773 @@
               ]
             },
             "description": "Run it right after a P4 raise for NO_ACTIVE_TASK, or during a P1's parallel phase for AMBIGUOUS_TASK."
+          },
+          "response": []
+        },
+        {
+          "name": "Complete an unknown userTaskKey -> 422 USER_TASK_NOT_FOUND",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('422 Unprocessable Entity', () => pm.response.to.have.status(422));",
+                  "pm.test('errorCode USER_TASK_NOT_FOUND', () =>",
+                  "  pm.expect(pm.response.json().errorCode).to.eql('USER_TASK_NOT_FOUND'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"completedBy\": \"api.tester\",\n  \"variables\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents/{{incidentId}}/tasks/999999999999/complete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents",
+                "{{incidentId}}",
+                "tasks",
+                "999999999999",
+                "complete"
+              ]
+            },
+            "description": "Needs any existing {{incidentId}}. The engine returns 404 for a key that doesn't exist or was already completed; the adapter translates it, so it comes back as a business error rather than a 500. Completing the same task twice hits this too."
+          },
+          "response": []
+        },
+        {
+          "name": "Malformed JSON body -> 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('titled Malformed request body', () =>",
+                  "  pm.expect(pm.response.json().title).to.eql('Malformed request body'));",
+                  "console.log('rejectedValue:', pm.response.json().rejectedValue);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"broken\",\n  \"source\":\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents"
+              ]
+            },
+            "description": "Jackson can't parse it, so bean validation never runs. The framework handler has no case for this and would return 500; IncidentWebExceptionHandler claims it and returns 400 with the parse error in rejectedValue."
+          },
+          "response": []
+        },
+        {
+          "name": "Field of the wrong type -> 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('titled Malformed request body', () =>",
+                  "  pm.expect(pm.response.json().title).to.eql('Malformed request body'));",
+                  "console.log('rejectedValue:', pm.response.json().rejectedValue);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"wrong type\",\n  \"source\": \"SIEM\",\n  \"recordCount\": \"lots\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents"
+              ]
+            },
+            "description": "recordCount is an Integer. Deserialisation fails before validation, so this is the same handler as malformed JSON, not a fieldErrors response."
+          },
+          "response": []
+        },
+        {
+          "name": "Path id that isn't a UUID -> 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('names the parameter', () =>",
+                  "  pm.expect(pm.response.json().detail).to.include('must be a valid UUID'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/incidents/not-a-uuid",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents",
+                "not-a-uuid"
+              ]
+            },
+            "description": "Different from 'unknown incident': that one is a well-formed UUID that doesn't exist (422), this one never converts to a UUID at all (400). Worth showing both."
+          },
+          "response": []
+        },
+        {
+          "name": "Invalid assetCriticality -> 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "const fields = (pm.response.json().fieldErrors || []).map(f => f.field);",
+                  "pm.test('reports assetCriticality', () => pm.expect(fields).to.include('assetCriticality'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"bad criticality\",\n  \"source\": \"SIEM\",\n  \"assetCriticality\": \"EXTREME\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents"
+              ]
+            },
+            "description": "The DMN only has rules for LOW/MEDIUM/HIGH/CRITICAL. Without this check 'EXTREME' would silently fall through to the catch-all rule and come back P3, which looks like the table is wrong rather than the request."
+          },
+          "response": []
+        },
+        {
+          "name": "Negative recordCount -> 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "const fields = (pm.response.json().fieldErrors || []).map(f => f.field);",
+                  "pm.test('reports recordCount', () => pm.expect(fields).to.include('recordCount'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"negative record count\",\n  \"source\": \"SIEM\",\n  \"recordCount\": -5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents"
+              ]
+            },
+            "description": "A negative count of exposed records is meaningless, and the regulatory DMN compares it against 500."
+          },
+          "response": []
+        },
+        {
+          "name": "Invalid slaDuration -> 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "const fe = pm.response.json().fieldErrors || [];",
+                  "pm.test('reports slaDuration', () => pm.expect(fe.map(f => f.field)).to.include('slaDuration'));",
+                  "console.log(fe[0] && fe[0].message);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"bad SLA duration\",\n  \"source\": \"SIEM\",\n  \"slaDuration\": \"20 seconds\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents"
+              ]
+            },
+            "description": "The timer boundary needs an ISO-8601 duration. '20 seconds' would be accepted at the API and then fail when Zeebe evaluates =slaDuration to create the timer, i.e. an incident in Operate on a token nobody is watching. Rejecting it here turns a stuck process into a typo."
+          },
+          "response": []
+        },
+        {
+          "name": "Invalid regulatoryDeadline -> 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "const fields = (pm.response.json().fieldErrors || []).map(f => f.field);",
+                  "pm.test('reports regulatoryDeadline', () => pm.expect(fields).to.include('regulatoryDeadline'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"bad regulatory deadline\",\n  \"source\": \"SIEM\",\n  \"regulatoryDeadline\": \"P\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents"
+              ]
+            },
+            "description": "'P' is the ISO-8601 prefix with no units, which the pattern rejects. Same reasoning as slaDuration."
+          },
+          "response": []
+        },
+        {
+          "name": "Unknown ad-hoc element id -> 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "const fe = pm.response.json().fieldErrors || [];",
+                  "pm.test('reports the offending list entry', () =>",
+                  "  pm.expect(fe.map(f => f.field).join(',')).to.include('responseActions['));",
+                  "console.log('field:', fe[0] && fe[0].field, '| rejected:', fe[0] && fe[0].rejectedValue);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"bad ad-hoc action\",\n  \"source\": \"SIEM\",\n  \"responseActions\": [\"Task_BlockIp\", \"Task_NukeEverything\"]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents"
+              ]
+            },
+            "description": "Only Task_BlockIp, Task_RevokeCredentials and Task_DeployPatch exist inside the ad-hoc sub-process. The error names the index, e.g. responseActions[1], so you can tell which entry is wrong. An unknown id would otherwise fail the ad-hoc activation at runtime."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "6 - Boundary events, timers & ad-hoc actions",
+      "description": "One request per boundary event in the model, plus the ad-hoc variants.\n\nThe model has five boundary events:\n  1. Isolation Failed (error)      on Isolate Systems            -> forceIsolationFailure\n  2. AI failed (error)             on AI Threat Triage           -> forceAiFailure\n  3. AI failed (error)             on AI Post-Incident Report    -> forceAiFailure\n  4. SLA breach (timer, non-int.)  on CISO Review                -> slaDuration\n  5. 72h deadline (timer, non-int.) on File Regulatory Notification -> regulatoryDeadline\n\nforceAiFailure points the AI Agent tasks at a model id OpenAI rejects, so the connector really\nfails, errorExpression really raises AI_STEP_FAILED, and the fallback worker really runs.\nslaDuration and regulatoryDeadline replace the PT4H / PT72H timers with something you can wait\nfor. Both timers are NON-INTERRUPTING: the user task stays open and the main flow carries on, so\nafter the escalation you still complete the task normally.\n\nEvery one of these leaves a row in GET /incidents/{id}/tasks/outcomes with completedBy\n'system:process' - that is the assertion surface. Run 'Verify boundary & timer events' after each.",
+      "item": [
+        {
+          "name": "AI triage failure -> fallback worker (fast, P4)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const d = pm.response.json().data;",
+                  "pm.collectionVariables.set('incidentId', d.id);",
+                  "console.log('incidentId =', d.id, '| AI triage boundary should fire, then P4 -> AUTO_CLOSED. Wait ~20s, then run Verify boundary & timer events.');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"AI triage failure demo\",\n  \"source\": \"SIEM\",\n  \"forceAiFailure\": true,\n  \"attackConfirmed\": false,\n  \"assetCriticality\": \"LOW\",\n  \"dataExposed\": false,\n  \"recordCount\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents"
+              ]
+            },
+            "description": "Isolates boundary event 2 on its own. The AI call fails, Boundary_TriageAiFailed routes to the triage worker anyway, and attackConfirmed=false makes it a P4 so it auto-closes in seconds without any human tasks. Expect an 'AI threat triage fallback' outcome row and status AUTO_CLOSED."
+          },
+          "response": []
+        },
+        {
+          "name": "AI failure on both steps -> drive to CLOSED (P2)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const d = pm.response.json().data;",
+                  "pm.collectionVariables.set('incidentId', d.id);",
+                  "console.log('incidentId =', d.id, '| both AI boundaries fire. Drive it with folder 3: 2 parallel tasks -> CISO Review -> Integrity Verification -> Incident Closure (P2 skips Legal).');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"AI unavailable end to end\",\n  \"source\": \"EDR\",\n  \"forceAiFailure\": true,\n  \"attackConfirmed\": true,\n  \"assetCriticality\": \"HIGH\",\n  \"dataExposed\": false,\n  \"recordCount\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents"
+              ]
+            },
+            "description": "Boundary events 2 and 3 in one run. P2 so the regulatory branch is skipped and you reach the post-incident report step in four completions. At the end the outcomes list has both 'AI threat triage fallback' and 'AI post-incident report fallback', and the incident still reaches CLOSED - the point being that an LLM outage degrades the process instead of stopping it."
+          },
+          "response": []
+        },
+        {
+          "name": "CISO SLA breach escalation (timer, 20s)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const d = pm.response.json().data;",
+                  "pm.collectionVariables.set('incidentId', d.id);",
+                  "console.log('incidentId =', d.id, '| complete the 2 parallel tasks, then LEAVE CISO Review open for ~25s. Then run Verify boundary & timer events.');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"SLA breach demo - unattended P1\",\n  \"source\": \"SIEM\",\n  \"slaDuration\": \"PT20S\",\n  \"attackConfirmed\": true,\n  \"assetCriticality\": \"CRITICAL\",\n  \"dataExposed\": false,\n  \"recordCount\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents"
+              ]
+            },
+            "description": "Boundary event 4. Normally a P1 gives the CISO PT4H; slaDuration overrides that to 20 seconds. The timer starts when CISO Review is created, i.e. after the parallel join, so complete Containment Verification and Forensic Analysis first, then wait. Non-interrupting, so CISO Review is still there afterwards and you can complete it as usual. Expect a 'SLA breach escalation (CISO review)' outcome row."
+          },
+          "response": []
+        },
+        {
+          "name": "Regulatory 72h deadline escalation (timer, 20s)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const d = pm.response.json().data;",
+                  "pm.collectionVariables.set('incidentId', d.id);",
+                  "console.log('incidentId =', d.id, '| drive to File Regulatory Notification, then leave it open ~25s.');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Breach notification deadline demo\",\n  \"source\": \"SIEM\",\n  \"regulatoryDeadline\": \"PT20S\",\n  \"attackConfirmed\": true,\n  \"assetCriticality\": \"CRITICAL\",\n  \"dataExposed\": true,\n  \"recordCount\": 25000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents"
+              ]
+            },
+            "description": "Boundary event 5, the one with the actual regulatory teeth. 25000 records exposed means the regulatory DMN returns true and Legal gets File Regulatory Notification. Complete everything up to it (parallel pair -> CISO Review -> Integrity Verification), then sit on it for 20s. Non-interrupting, so Legal keeps the task; the escalation just tells the CISO the clock ran out. Expect a 'Regulatory deadline escalation (72h)' outcome row."
+          },
+          "response": []
+        },
+        {
+          "name": "All three ad-hoc response actions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const d = pm.response.json().data;",
+                  "pm.collectionVariables.set('incidentId', d.id);",
+                  "console.log('incidentId =', d.id, '| all three ad-hoc tasks activate. Check Operate: Block IP, Revoke Credentials, Deploy Patch all completed inside the ad-hoc sub-process.');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Full response playbook\",\n  \"source\": \"EDR\",\n  \"responseActions\": [\"Task_BlockIp\", \"Task_RevokeCredentials\", \"Task_DeployPatch\"],\n  \"attackConfirmed\": true,\n  \"assetCriticality\": \"CRITICAL\",\n  \"dataExposed\": false,\n  \"recordCount\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents"
+              ]
+            },
+            "description": "The default only activates Block IP and Revoke Credentials, so Deploy Patch is never exercised. This picks all three. Valid element ids are Task_BlockIp, Task_RevokeCredentials, Task_DeployPatch - the ad-hoc sub-process activates exactly what you list, which is the modelling point: the commander chooses the actions, the process doesn't dictate them."
+          },
+          "response": []
+        },
+        {
+          "name": "Single ad-hoc action (block IP only)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const d = pm.response.json().data;",
+                  "pm.collectionVariables.set('incidentId', d.id);",
+                  "console.log('incidentId =', d.id, '| only Block IP runs in the ad-hoc sub-process.');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Minimal response - block the C2 address only\",\n  \"source\": \"Threat Intel\",\n  \"responseActions\": [\"Task_BlockIp\"],\n  \"attackConfirmed\": true,\n  \"assetCriticality\": \"MEDIUM\",\n  \"dataExposed\": false,\n  \"recordCount\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents"
+              ]
+            },
+            "description": "The other end of the ad-hoc range: one action. Proves the branch completes on whatever subset was activated rather than waiting for a fixed set."
+          },
+          "response": []
+        },
+        {
+          "name": "Every boundary event in one run (full sweep)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const d = pm.response.json().data;",
+                  "pm.collectionVariables.set('incidentId', d.id);",
+                  "console.log('incidentId =', d.id, '| expect, in order: AI triage fallback -> Handle Isolation Failure task -> SLA escalation at CISO Review -> 72h escalation at Legal -> AI report fallback -> CLOSED.');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Worst-case incident - everything that can go wrong does\",\n  \"source\": \"SIEM\",\n  \"forceIsolationFailure\": true,\n  \"forceAiFailure\": true,\n  \"slaDuration\": \"PT20S\",\n  \"regulatoryDeadline\": \"PT20S\",\n  \"responseActions\": [\"Task_BlockIp\", \"Task_RevokeCredentials\", \"Task_DeployPatch\"],\n  \"attackConfirmed\": true,\n  \"assetCriticality\": \"CRITICAL\",\n  \"dataExposed\": true,\n  \"recordCount\": 25000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents"
+              ]
+            },
+            "description": "All five boundary events plus every ad-hoc action, on one incident.\n\nWalkthrough: AI triage fails -> fallback. Containment isolation fails -> Handle Isolation Failure (commander) instead of going straight to Containment Verification, so the parallel phase opens Handle Isolation Failure + Forensic Analysis, then Containment Verification. After the join, park on CISO Review for 25s to trip the SLA timer, complete it, then Integrity Verification, then park on File Regulatory Notification for 25s to trip the deadline timer. Complete it, AI report fails -> fallback, Incident Closure -> CLOSED.\n\nVerify boundary & timer events should then list four system rows."
+          },
+          "response": []
+        },
+        {
+          "name": "Verify boundary & timer events",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const items = pm.response.json().data || [];",
+                  "const system = items.filter(o => o.completedBy === 'system:process');",
+                  "const human = items.filter(o => o.completedBy !== 'system:process');",
+                  "console.log('Boundary / timer events:', system.map(o => o.taskName + ' @ ' + o.elementId).join(' | ') || '(none yet)');",
+                  "console.log('Human completions:', human.map(o => o.taskName).join(' | ') || '(none yet)');",
+                  "pm.test('at least one boundary or timer event recorded', () => pm.expect(system.length).to.be.above(0));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/incidents/{{incidentId}}/tasks/outcomes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents",
+                "{{incidentId}}",
+                "tasks",
+                "outcomes"
+              ]
+            },
+            "description": "Same endpoint as folder 3, read the other way round. Rows with completedBy 'system:process' and userTaskKey 0 are the automated ones: AI fallbacks and timer escalations. Everything else is a human completion. The isolation-failure boundary is the exception - it produces a real user task (Handle Isolation Failure), so it shows up as a human row.\n\nAllow ~20s after raising before expecting a fallback row, and slaDuration/regulatoryDeadline plus a few seconds for the timers."
           },
           "response": []
         }

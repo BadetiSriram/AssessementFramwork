@@ -59,8 +59,9 @@ the incident, which is how we find its user tasks later.
 
 Variables handed to Camunda at start: `businessKey` (the incident id), `incidentId`, `title`,
 `source`, `forceIsolationFailure`, an empty `triageReport`, `responseActions`
-(`["Task_BlockIp","Task_RevokeCredentials"]`), empty `triageAgent` and `reportAgent` maps for the
-connector input mappings, and the four triage signals.
+(`["Task_BlockIp","Task_RevokeCredentials"]` unless the caller picks), empty `triageAgent` and
+`reportAgent` maps for the connector input mappings, the four triage signals, `aiModel` (the model
+the AI Agent tasks call), `slaOverride` and `regulatoryDeadline` (`PT72H` unless overridden).
 
 Those signals are what steer the DMNs, and they come off the request:
 
@@ -148,5 +149,22 @@ completes either way.
 The workers are stubs. They return the variables listed above rather than calling a real SIEM,
 firewall, IAM or mail system; the orchestration is the point here.
 
-For the isolation-failure path, raise with
-`{"title":"...","source":"SIEM","forceIsolationFailure":true}`.
+## Forcing the exception paths
+
+The five boundary events need an outage, a failed isolation and a 72-hour wait to happen naturally,
+so the raise body takes overrides:
+
+| Field | Trips |
+|---|---|
+| `forceIsolationFailure:true` | error boundary on Isolate Systems → Handle Isolation Failure |
+| `forceAiFailure:true` | error boundaries on both AI Agent tasks → fallback workers |
+| `slaDuration:"PT20S"` | SLA timer on CISO Review |
+| `regulatoryDeadline:"PT20S"` | 72h timer on File Regulatory Notification |
+| `responseActions:[...]` | which ad-hoc actions run (`Task_BlockIp`, `Task_RevokeCredentials`, `Task_DeployPatch`) |
+
+`forceAiFailure` sets the `aiModel` variable to a model id OpenAI rejects, so the connector really
+gets a 4xx and `errorExpression` really raises `AI_STEP_FAILED` - nothing is stubbed out.
+
+Each automated one writes a row to `GET /incidents/{id}/tasks/outcomes` with `completedBy` set to
+`system:process`, which is how you prove it fired without reading the logs. Sending all five at
+once on a P1 hits every boundary event and still ends at CLOSED.

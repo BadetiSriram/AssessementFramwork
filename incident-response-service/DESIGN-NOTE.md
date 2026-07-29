@@ -99,9 +99,17 @@ A P1 driven end to end to CLOSED: parallel forensic analysis and containment ver
 CISO review, integrity verification, regulatory filing and closure, with all six outcomes in
 Postgres.
 
-The exception paths are modelled and demonstrable in Operate: isolation failure escalating to the
-commander (`forceIsolationFailure=true`), P4 auto-close, AI failure falling back to the worker, and
-both escalation timers.
+All five boundary events, driven on one incident (`forceIsolationFailure` + `forceAiFailure` +
+`slaDuration:PT20S` + `regulatoryDeadline:PT20S`): AI triage fell back to the worker, isolation
+failure escalated to the commander, the SLA timer fired 20s into CISO Review without cancelling it,
+the regulatory timer fired 20s into the Legal task without cancelling it, the AI report fell back,
+and the incident still reached CLOSED. A control run without `forceAiFailure` produced no fallback
+row, which confirms the AI steps genuinely succeed when the connector is healthy and that the
+failure injection is real rather than an artefact of a missing secret.
+
+Every automated event lands in `incident_task_outcomes` as a `system:process` row next to the human
+completions, so the audit trail is one ordered list of what happened and who did it. P4 auto-close
+and the ad-hoc subsets (including Deploy Patch, which the default never activates) verified too.
 
 ## 8. Assumptions
 
