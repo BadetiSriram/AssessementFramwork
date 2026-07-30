@@ -13,6 +13,32 @@ come in. The CISO authorises recovery, a second DMN decides whether Legal has to
 Automated steps are idempotent job workers, human steps are native user tasks with forms and
 candidate groups, and the two AI steps are connector tasks.
 
+## 1a. The human steps carry the incident file forward
+
+Each of the seven forms opens with a read-only briefing panel — an `html` component using feelers
+templating over the process variables — showing everything the process knows at that point. The CISO
+sees the forensic findings, the containment outcome and the actions that ran; the analyst verifying
+integrity sees the recovery conditions the CISO imposed; the commander closing the incident sees the
+post-incident report in full. Nothing in a briefing panel is bound to a `key`, so displaying a value
+can never overwrite it.
+
+Two consequences worth being explicit about:
+
+- **Forensic findings drive the regulatory decision.** Two `expression` components on the forensic
+  form recompute `dataExposed` and `recordCount` on submit, so the regulatory DMN is evaluated
+  against the analyst's confirmed exposure rather than the SIEM's opening estimate. Both are written
+  to fall through to the existing value when the new fields are left empty, so a caller that submits
+  only the original fields gets exactly the old behaviour.
+- **Sign-off checkboxes are `required`.** `containmentVerified`, `recoveryAuthorized`,
+  `integrityVerified`, `notificationFiled` and `lessonsLearnedCaptured` all gate a forward-only path
+  — the model has no "rejected" branch for them. Making them required means the form refuses to
+  submit rather than recording a "no" the process would then ignore. Declining means leaving the task
+  open, which is what the model actually supports.
+
+Note that Camunda renders forms with **feelin** (the JavaScript FEEL engine), not the Scala engine
+used server-side. The two have different built-in function sets — `get or else()` works in a BPMN
+expression but not in a form template, so the forms use `if x = null then … else x` throughout.
+
 ## 2. Embedded sub-processes, not call activities
 
 Containment, Forensics and Recovery are embedded. Nothing else reuses them, they work purely on the
@@ -53,9 +79,19 @@ Both use the AI Agent connector (`io.camunda.agenticai:aiagent:1`) against `gpt-
 key coming from the `OPENAI_API_TOKEN` cluster secret rather than the model.
 
 Prompts are built from process variables. Triage gets a SOC-triage system prompt plus `title` and
-`source`; the report gets an analyst prompt plus `title`, `severity` and the `triageReport` the
-first step produced. Results are mapped back through `resultExpression` into `triageReport` and
-`postIncidentReport`.
+`source`. The report prompt is a full dossier: the incident header, then every human finding the
+process collected — the forensic characterisation (attack vector, MITRE technique, patient zero,
+root cause, scope, records, dwell time, exfiltration status, data categories, IOCs), the containment
+outcome and its verification checks, the CISO's residual-risk decision and recovery conditions, the
+integrity result, and the regulatory position. Results are mapped back through `resultExpression`
+into `triageReport` and `postIncidentReport`.
+
+Every operand in that prompt is wrapped in an `if x = null then "…" else x` guard. This matters more
+than it looks: FEEL returns `null` for a missing variable and `"text" + null` is also `null`, so one
+absent field in a bare concatenation would blank the entire prompt, the connector would reject it,
+and the failure would surface as a *spurious* `AI_STEP_FAILED` boundary firing. The guards mean an
+unrecorded field reads as "not recorded" in the report — which is itself a finding about the
+response.
 
 Each task sets `retries=3` and an `errorExpression` that raises `bpmnError("AI_STEP_FAILED")`. An
 error boundary event then routes to the equivalent job worker. The point is that an AI outage
@@ -77,7 +113,8 @@ redelivered alert or a replayed job. The actions themselves are written to be na
 too; blocking an IP twice should be a no-op.
 
 Two escalation timers, both non-interrupting so the task stays open: `=slaDuration` on CISO Review
-(derived from severity: 4h for P1 through 72h for P4) and a fixed 72 hours on the regulatory task.
+(derived from severity: 4h for P1 through 72h for P4) and `=regulatoryDeadline` on the regulatory
+task (72 hours unless the caller overrides it).
 
 Compensation isn't modelled. Nothing here is a monetary or otherwise irreversible saga step, so
 there's nothing to unwind; `WorkResult.compensated()` is there if that changes.
@@ -110,6 +147,19 @@ failure injection is real rather than an artefact of a missing secret.
 Every automated event lands in `incident_task_outcomes` as a `system:process` row next to the human
 completions, so the audit trail is one ordered list of what happened and who did it. P4 auto-close
 and the ad-hoc subsets (including Deploy Patch, which the default never activates) verified too.
+
+**The form rewrite** was verified statically, ahead of a cluster run. All seven forms validate
+against the published `@bpmn-io/form-json-schema`, so the component types, per-type required
+properties and enum values are right rather than plausible. Every briefing panel was rendered through
+the real `feelers` engine against three variable sets — a fresh instance where automated isolation
+succeeded, the error path where the commander contained by hand, and a fully populated late-stage
+instance — asserting no unresolved `{{…}}` and no bare `null` reaches the screen. That pass is what
+caught `get or else()` being absent from feelin. The two forensic expression components were
+evaluated across seven input combinations to confirm that omitting the new fields leaves
+`dataExposed` and `recordCount` untouched, and the report prompt was evaluated after being read back
+out of the BPMN attribute, including the worst case where the regulatory branch was skipped and every
+optional field is absent. Still outstanding: deploying to the cluster and opening each form in
+Tasklist, which is the only way to confirm the panels lay out as intended.
 
 ## 8. Assumptions
 

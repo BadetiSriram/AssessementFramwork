@@ -2,24 +2,92 @@
   "type": "default",
   "id": "handle-isolation-failure-form",
   "schemaVersion": 18,
+  "executionPlatform": "Camunda Cloud",
+  "executionPlatformVersion": "8.9.0",
   "components": [
     {
-      "type": "text",
-      "id": "hif_intro",
-      "text": "## Handle Isolation Failure\nAutomated isolation failed. Decide and record the manual containment action."
+      "type": "html",
+      "id": "hif_brief",
+      "content": "<style>.b{font-size:14px;line-height:1.55;border:1px solid #d0d5dd;border-radius:6px;background:#fcfcfd;padding:14px 16px}.b h3{margin:0 0 8px;font-size:15px}.b h4{margin:14px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#475467;border-top:1px solid #eaecf0;padding-top:10px}.b dl{display:grid;grid-template-columns:190px 1fr;gap:4px 12px;margin:0}.b dt{color:#475467}.b dd{margin:0;font-weight:600;overflow-wrap:anywhere}.b .rep{white-space:pre-wrap;background:#fff;border:1px solid #eaecf0;border-radius:4px;padding:10px;font-weight:400;margin-top:4px}.alert{border:1px solid #fda29b;background:#fef3f2;border-radius:6px;padding:10px 14px;margin-bottom:10px;font-weight:600;color:#912018}.tag{display:inline-block;padding:1px 9px;border-radius:10px;color:#fff;font-size:12px;font-weight:700}.p1{background:#b42318}.p2{background:#c4320a}.p3{background:#b54708}.p4{background:#475467}</style>\n<div class=\"alert\">Automated isolation FAILED &mdash; the affected systems are still reachable. Contain them by hand, then record what you did.</div>\n<div class=\"b\">\n<h3>{{if title = null then \"Untitled incident\" else title}} {{#if severity = \"P1\"}}<span class=\"tag p1\">P1</span>{{/if}}{{#if severity = \"P2\"}}<span class=\"tag p2\">P2</span>{{/if}}{{#if severity = \"P3\"}}<span class=\"tag p3\">P3</span>{{/if}}{{#if severity = \"P4\"}}<span class=\"tag p4\">P4</span>{{/if}}</h3>\n<dl>\n<dt>Incident reference</dt><dd>{{if businessKey = null then \"unknown\" else businessKey}}</dd>\n<dt>Detection source</dt><dd>{{if source = null then \"unknown\" else source}}</dd>\n<dt>Asset criticality</dt><dd>{{if assetCriticality = null then \"unknown\" else assetCriticality}}</dd>\n<dt>Data exposed (initial)</dt><dd>{{if dataExposed = true then \"Yes\" else \"No\"}}</dd>\n<dt>Records in scope (initial)</dt><dd>{{if recordCount = null then \"unknown\" else recordCount}}</dd>\n<dt>CISO review SLA</dt><dd>{{if slaDuration = null then \"not set yet\" else slaDuration}}</dd>\n</dl>\n<h4>Threat triage {{#if triageSource = \"FALLBACK\"}}(AI unavailable &mdash; recorded without enrichment){{/if}}</h4>\n<div class=\"rep\">{{if triageReport = null then \"No triage narrative recorded.\" else triageReport}}</div>\n</div>"
+    },
+    { "type": "separator", "id": "hif_sep" },
+    {
+      "type": "select",
+      "id": "hif_reason",
+      "key": "isolationFailureReason",
+      "label": "Why did automated isolation fail?",
+      "description": "Recorded on the incident and carried into the post-incident report as a control gap.",
+      "values": [
+        { "label": "EDR agent unreachable or not installed", "value": "EDR agent unreachable" },
+        { "label": "Host already offline / unresponsive", "value": "Host offline" },
+        { "label": "Network or EDR API call failed", "value": "API call failed" },
+        { "label": "Credentials rejected by the segmentation API", "value": "Credential failure" },
+        { "label": "Asset not in the inventory / unknown to tooling", "value": "Asset not in inventory" },
+        { "label": "Blocked by change freeze or approval gate", "value": "Change freeze" },
+        { "label": "Other (describe below)", "value": "Other" }
+      ],
+      "validate": { "required": true }
     },
     {
-      "type": "checkbox",
-      "id": "hif_contained",
-      "key": "manuallyContained",
-      "label": "Systems manually contained"
+      "type": "radio",
+      "id": "hif_method",
+      "key": "containmentMethod",
+      "label": "Manual containment method used",
+      "values": [
+        { "label": "Network ACL applied and switch ports disabled", "value": "Network ACL + switch port disable" },
+        { "label": "Host quarantined via EDR console", "value": "EDR host quarantine" },
+        { "label": "Powered off (volatile evidence will be lost)", "value": "Powered off" },
+        { "label": "VM snapshot taken, then suspended (evidence preserved)", "value": "Snapshot + suspend" },
+        { "label": "Account disabled only, host left running", "value": "Account disable only" }
+      ],
+      "validate": { "required": true }
     },
     {
       "type": "textarea",
       "id": "hif_action",
       "key": "isolationFailureAction",
       "label": "Action taken",
+      "description": "What you did, on which assets, and anything the SOC analyst needs to re-check during verification.",
+      "validate": { "required": true, "minLength": 20 }
+    },
+    {
+      "type": "number",
+      "id": "hif_count",
+      "key": "assetsIsolatedCount",
+      "label": "Assets contained",
+      "layout": { "row": "Row_hif_1", "columns": 6 }
+    },
+    {
+      "type": "datetime",
+      "id": "hif_at",
+      "key": "isolationCompletedAt",
+      "subtype": "datetime",
+      "dateLabel": "Containment completed (date)",
+      "timeLabel": "Time",
+      "use24h": true,
+      "timeSerializingFormat": "utc_offset",
+      "layout": { "row": "Row_hif_1", "columns": 10 }
+    },
+    {
+      "type": "checkbox",
+      "id": "hif_contained",
+      "key": "manuallyContained",
+      "label": "I confirm the affected systems are now contained",
+      "description": "Required. The process moves straight to containment verification from here — if the systems are not contained, do not submit; keep the task open and escalate.",
       "validate": { "required": true }
+    },
+    {
+      "type": "checkbox",
+      "id": "hif_impact",
+      "key": "businessImpactAccepted",
+      "label": "Manual containment caused a service outage that the service owner has accepted"
+    },
+    {
+      "type": "textfield",
+      "id": "hif_approver",
+      "key": "serviceOwnerApprover",
+      "label": "Service owner who accepted the outage",
+      "conditional": { "hide": "=not(businessImpactAccepted = true)" }
     }
   ]
 }

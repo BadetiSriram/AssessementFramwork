@@ -2,23 +2,147 @@
   "type": "default",
   "id": "incident-closure-form",
   "schemaVersion": 18,
+  "executionPlatform": "Camunda Cloud",
+  "executionPlatformVersion": "8.9.0",
   "components": [
     {
-      "type": "text",
-      "id": "cl_intro",
-      "text": "## Incident Closure\nReview the post-incident report and formally close the incident."
+      "type": "html",
+      "id": "cl_brief",
+      "content": "<style>.b{font-size:14px;line-height:1.55;border:1px solid #d0d5dd;border-radius:6px;background:#fcfcfd;padding:14px 16px}.b h3{margin:0 0 8px;font-size:15px}.b h4{margin:16px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#475467;border-top:1px solid #eaecf0;padding-top:10px}.b dl{display:grid;grid-template-columns:200px 1fr;gap:4px 12px;margin:0}.b dt{color:#475467}.b dd{margin:0;font-weight:600;overflow-wrap:anywhere}.b ul{margin:2px 0 0;padding-left:20px}.b li{font-weight:600}.b .rep{white-space:pre-wrap;background:#fff;border:1px solid #eaecf0;border-radius:4px;padding:12px;font-weight:400;margin-top:4px}.esc{border:1px solid #fda29b;background:#fef3f2;border-radius:6px;padding:10px 14px;margin-bottom:10px;font-weight:600;color:#912018}.tag{display:inline-block;padding:1px 9px;border-radius:10px;color:#fff;font-size:12px;font-weight:700}.p1{background:#b42318}.p2{background:#c4320a}.p3{background:#b54708}.p4{background:#475467}</style>\n{{#if escalated = true}}<div class=\"esc\">This incident breached at least one deadline and an escalation was raised. Say why in the lessons learned.</div>{{/if}}\n<div class=\"b\">\n<h3>{{if title = null then \"Untitled incident\" else title}} {{#if severity = \"P1\"}}<span class=\"tag p1\">P1</span>{{/if}}{{#if severity = \"P2\"}}<span class=\"tag p2\">P2</span>{{/if}}{{#if severity = \"P3\"}}<span class=\"tag p3\">P3</span>{{/if}}{{#if severity = \"P4\"}}<span class=\"tag p4\">P4</span>{{/if}}</h3>\n<dl>\n<dt>Incident reference</dt><dd>{{if businessKey = null then \"unknown\" else businessKey}}</dd>\n<dt>Detection source</dt><dd>{{if source = null then \"unknown\" else source}}</dd>\n</dl>\n\n<h4>Post-incident report</h4>\n<div class=\"rep\">{{if postIncidentReport = null then \"No post-incident report was produced.\" else postIncidentReport}}</div>\n\n<h4>Forensics</h4>\n<dl>\n<dt>Attack vector</dt><dd>{{if attackVector = null then \"not recorded\" else attackVector}}</dd>\n<dt>MITRE ATT&amp;CK technique</dt><dd>{{if mitreTechnique = null then \"not recorded\" else mitreTechnique}}</dd>\n<dt>Root cause</dt><dd>{{if rootCause = null then \"not recorded\" else rootCause}}</dd>\n<dt>Scope / impacted assets</dt><dd>{{if impactScope = null then \"not recorded\" else impactScope}}</dd>\n<dt>Records affected</dt><dd>{{if recordCount = null then \"unknown\" else recordCount}}</dd>\n<dt>Dwell time</dt><dd>{{if dwellTimeHours = null then \"not recorded\" else string(dwellTimeHours) + \" hours\"}}</dd>\n<dt>Data exfiltration</dt><dd>{{if exfiltrationConfirmed = \"CONFIRMED\" then \"Confirmed\" else if exfiltrationConfirmed = \"SUSPECTED\" then \"Suspected\" else if exfiltrationConfirmed = \"RULED_OUT\" then \"Ruled out\" else \"not recorded\"}}</dd>\n</dl>\n\n<h4>Containment and recovery</h4>\n<dl>\n<dt>How it was contained</dt><dd>{{if manuallyContained = true then \"Manually, after automated isolation failed\" else \"Automated isolation by the response platform\"}}</dd>\n<dt>Containment verified</dt><dd>{{if containmentVerified = true then \"Yes\" else \"No\"}}</dd>\n<dt>Residual exposure at handover</dt><dd>{{if residualExposure = null then \"not recorded\" else residualExposure}}</dd>\n<dt>Integrity checks passed</dt><dd>{{#if integrityChecks != null}}<ul>{{#loop integrityChecks}}<li>{{this}}</li>{{/loop}}</ul>{{/if}}{{#if integrityChecks = null}}none recorded{{/if}}</dd>\n<dt>Integrity verified</dt><dd>{{if integrityVerified = true then \"Yes\" else \"No\"}}</dd>\n<dt>Analyst notes</dt><dd>{{if integrityNotes = null then \"none\" else integrityNotes}}</dd>\n</dl>\n\n<h4>CISO decision</h4>\n<dl>\n<dt>Residual risk rating</dt><dd>{{if residualRiskRating = null then \"not recorded\" else residualRiskRating}}</dd>\n<dt>Residual risk accepted</dt><dd>{{if residualRiskAccepted = true then \"Yes\" else \"No\"}}</dd>\n<dt>Basis for acceptance</dt><dd>{{if riskAcceptanceRationale = null then \"not recorded\" else riskAcceptanceRationale}}</dd>\n<dt>External comms position</dt><dd>{{if externalCommsApproved = null then \"not set\" else externalCommsApproved}}</dd>\n<dt>Board notification</dt><dd>{{if boardNotificationRequired = true then \"Required\" else \"Not required\"}}</dd>\n<dt>Decision record</dt><dd>{{if cisoNotes = null then \"none\" else cisoNotes}}</dd>\n</dl>\n\n<h4>Regulatory position</h4>\n<dl>\n<dt>Notification required</dt><dd>{{if regulatoryRequired = true then \"Yes - the decision table required a filing\" else \"No - below the notification threshold\"}}</dd>\n<dt>Authorities notified</dt><dd>{{#if regulators != null}}<ul>{{#loop regulators}}<li>{{this}}</li>{{/loop}}</ul>{{/if}}{{#if regulators = null}}none{{/if}}</dd>\n<dt>Jurisdictions</dt><dd>{{if jurisdictions = null then \"not applicable\" else jurisdictions}}</dd>\n<dt>Filing reference</dt><dd>{{if filingReference = null then \"not applicable\" else filingReference}}</dd>\n<dt>Filed at</dt><dd>{{if filedAt = null then \"not applicable\" else filedAt}}</dd>\n<dt>Data subjects</dt><dd>{{if dataSubjectsNotificationRequired = null then \"not assessed\" else dataSubjectsNotificationRequired}}</dd>\n</dl>\n</div>"
+    },
+    { "type": "separator", "id": "cl_sep" },
+    {
+      "type": "group",
+      "id": "cl_grp_lessons",
+      "label": "Post-incident review",
+      "showOutline": true,
+      "components": [
+        {
+          "type": "textarea",
+          "id": "cl_lessons_text",
+          "key": "lessonsLearned",
+          "label": "Lessons learned",
+          "description": "What went wrong, what worked, and what the organisation is changing as a result.",
+          "validate": { "required": true, "minLength": 30 }
+        },
+        {
+          "type": "radio",
+          "id": "cl_preventable",
+          "key": "preventableWithExistingControls",
+          "label": "Was this preventable with controls we already had?",
+          "values": [
+            { "label": "Yes — an existing control was not applied or not working", "value": "Yes" },
+            { "label": "Partially", "value": "Partially" },
+            { "label": "No — the control gap was genuine", "value": "No" }
+          ],
+          "validate": { "required": true }
+        },
+        {
+          "type": "checklist",
+          "id": "cl_gaps",
+          "key": "controlGaps",
+          "label": "Control gaps this incident exposed",
+          "values": [
+            { "label": "MFA coverage", "value": "MFA coverage" },
+            { "label": "Egress filtering", "value": "Egress filtering" },
+            { "label": "EDR coverage", "value": "EDR coverage" },
+            { "label": "Patch cadence", "value": "Patch cadence" },
+            { "label": "Backup isolation", "value": "Backup isolation" },
+            { "label": "Logging and detection coverage", "value": "Logging and detection coverage" },
+            { "label": "User awareness", "value": "User awareness" },
+            { "label": "Asset inventory accuracy", "value": "Asset inventory accuracy" }
+          ]
+        }
+      ]
     },
     {
-      "type": "checkbox",
-      "id": "cl_lessons",
-      "key": "lessonsLearnedCaptured",
-      "label": "Lessons learned captured"
+      "type": "dynamiclist",
+      "id": "cl_followups",
+      "path": "followUpActions",
+      "label": "Follow-up actions",
+      "isRepeating": true,
+      "allowAddRemove": true,
+      "defaultRepetitions": 1,
+      "showOutline": true,
+      "components": [
+        {
+          "type": "textfield",
+          "id": "cl_fu_action",
+          "key": "action",
+          "label": "Action",
+          "layout": { "row": "Row_cl_fu", "columns": 8 }
+        },
+        {
+          "type": "textfield",
+          "id": "cl_fu_owner",
+          "key": "owner",
+          "label": "Owner",
+          "layout": { "row": "Row_cl_fu", "columns": 4 }
+        },
+        {
+          "type": "datetime",
+          "id": "cl_fu_due",
+          "key": "dueDate",
+          "subtype": "date",
+          "dateLabel": "Due",
+          "layout": { "row": "Row_cl_fu", "columns": 4 }
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "id": "cl_grp_metrics",
+      "label": "Response metrics",
+      "showOutline": true,
+      "components": [
+        {
+          "type": "number",
+          "id": "cl_mttd",
+          "key": "mttdHours",
+          "label": "Time to detect (hours)",
+          "validate": { "min": 0 },
+          "layout": { "row": "Row_cl_1", "columns": 5 }
+        },
+        {
+          "type": "number",
+          "id": "cl_mttr",
+          "key": "mttrHours",
+          "label": "Time to resolve (hours)",
+          "validate": { "min": 0 },
+          "layout": { "row": "Row_cl_1", "columns": 5 }
+        },
+        {
+          "type": "datetime",
+          "id": "cl_review",
+          "key": "postIncidentReviewDate",
+          "subtype": "date",
+          "dateLabel": "Post-incident review scheduled",
+          "layout": { "row": "Row_cl_1", "columns": 6 }
+        }
+      ]
+    },
+    {
+      "type": "textfield",
+      "id": "cl_approver",
+      "key": "closureApprover",
+      "label": "Closure approved by",
+      "layout": { "row": "Row_cl_2", "columns": 8 }
     },
     {
       "type": "textarea",
       "id": "cl_notes",
       "key": "closureNotes",
-      "label": "Closure notes"
+      "label": "Closure notes",
+      "description": "Final statement on the record for this incident.",
+      "validate": { "required": true, "minLength": 20 }
+    },
+    {
+      "type": "checkbox",
+      "id": "cl_lessons",
+      "key": "lessonsLearnedCaptured",
+      "label": "I confirm the post-incident review is complete and lessons learned are captured",
+      "description": "Required. The incident is closed as soon as this task completes.",
+      "validate": { "required": true }
     }
   ]
 }

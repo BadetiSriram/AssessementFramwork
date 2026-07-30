@@ -123,6 +123,22 @@ process variables (`slaDuration`, `regulatoryDeadline`), so a demo can override 
 
 `soc-analyst`, `incident-commander`, `forensics-lead`, `ciso`, `legal-compliance`.
 
+## Forms
+
+Each of the 7 forms opens with a read-only briefing panel of what the process knows at that point,
+then asks for that role's findings. The chain that matters: forensics records attack vector, MITRE
+technique, root cause, scope, IOCs, data categories and exfiltration status → the CISO reviews all of
+it on one screen before rating and accepting residual risk → the analyst verifying integrity sees the
+recovery conditions the CISO imposed → the commander closes against the full AI report.
+
+Two forensic fields feed the automation back: `exfiltrationConfirmed` + `dataCategories` recompute
+`dataExposed`, and `confirmedRecordCount` overrides `recordCount`, so the regulatory DMN decides on
+confirmed findings rather than the SIEM's estimate. Leave them empty and the old values stand.
+
+Sign-off checkboxes (`containmentVerified`, `recoveryAuthorized`, `integrityVerified`,
+`notificationFiled`, `lessonsLearnedCaptured`) are `required`: the model has no rejection branch, so
+declining means leaving the task open rather than submitting a "no" nothing would act on.
+
 ## Exception paths worth showing
 
 All five are reachable from the raise body, and every automated one leaves a `system:process` row in

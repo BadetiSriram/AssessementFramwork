@@ -2,29 +2,107 @@
   "type": "default",
   "id": "file-regulatory-notification-form",
   "schemaVersion": 18,
+  "executionPlatform": "Camunda Cloud",
+  "executionPlatformVersion": "8.9.0",
   "components": [
     {
-      "type": "text",
-      "id": "reg_intro",
-      "text": "## File Regulatory Notification\nFile the required regulatory and customer notifications within the 72-hour deadline."
+      "type": "html",
+      "id": "reg_brief",
+      "content": "<style>.b{font-size:14px;line-height:1.55;border:1px solid #d0d5dd;border-radius:6px;background:#fcfcfd;padding:14px 16px}.b h3{margin:0 0 8px;font-size:15px}.b h4{margin:16px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#475467;border-top:1px solid #eaecf0;padding-top:10px}.b dl{display:grid;grid-template-columns:200px 1fr;gap:4px 12px;margin:0}.b dt{color:#475467}.b dd{margin:0;font-weight:600;overflow-wrap:anywhere}.b ul{margin:2px 0 0;padding-left:20px}.b li{font-weight:600}.dead{border:1px solid #fec84b;background:#fffaeb;border-radius:6px;padding:10px 14px;margin-bottom:10px;color:#93370d}.esc{border:1px solid #fda29b;background:#fef3f2;border-radius:6px;padding:10px 14px;margin-bottom:10px;font-weight:600;color:#912018}.why{border:1px solid #eaecf0;background:#f9fafb;border-radius:6px;padding:10px 14px;margin-bottom:10px}.tag{display:inline-block;padding:1px 9px;border-radius:10px;color:#fff;font-size:12px;font-weight:700}.p1{background:#b42318}.p2{background:#c4320a}.p3{background:#b54708}.p4{background:#475467}</style>\n<div class=\"dead\"><strong>Filing deadline: {{if regulatoryDeadline = null then \"PT72H\" else regulatoryDeadline}}</strong> from the point this task was created. A boundary timer escalates to the CISO if it passes while this task is still open &mdash; the task is not cancelled, so file it even if the deadline has gone.</div>\n{{#if escalated = true}}<div class=\"esc\">An escalation has already been raised on this incident.</div>{{/if}}\n<div class=\"why\"><strong>Why this filing is required.</strong> The regulatory decision table returned <em>notification required</em> because forensics confirmed data exposure with {{if recordCount = null then \"an unknown number of\" else recordCount}} records affected (the threshold is 500).</div>\n<div class=\"b\">\n<h3>{{if title = null then \"Untitled incident\" else title}} {{#if severity = \"P1\"}}<span class=\"tag p1\">P1</span>{{/if}}{{#if severity = \"P2\"}}<span class=\"tag p2\">P2</span>{{/if}}{{#if severity = \"P3\"}}<span class=\"tag p3\">P3</span>{{/if}}{{#if severity = \"P4\"}}<span class=\"tag p4\">P4</span>{{/if}}</h3>\n<dl>\n<dt>Incident reference</dt><dd>{{if businessKey = null then \"unknown\" else businessKey}}</dd>\n<dt>Detection source</dt><dd>{{if source = null then \"unknown\" else source}}</dd>\n</dl>\n<h4>The facts you are filing on</h4>\n<dl>\n<dt>Data exfiltration</dt><dd>{{if exfiltrationConfirmed = \"CONFIRMED\" then \"Confirmed - data left the environment\" else if exfiltrationConfirmed = \"SUSPECTED\" then \"Suspected - staged or accessed, egress not proven\" else if exfiltrationConfirmed = \"RULED_OUT\" then \"Ruled out\" else \"not recorded\"}}</dd>\n<dt>Records affected (confirmed)</dt><dd>{{if recordCount = null then \"unknown\" else recordCount}}</dd>\n<dt>Data categories</dt><dd>{{#if dataCategories != null}}<ul>{{#loop dataCategories}}<li>{{this}}</li>{{/loop}}</ul>{{/if}}{{#if dataCategories = null}}none recorded{{/if}}</dd>\n<dt>Attack vector</dt><dd>{{if attackVector = null then \"not recorded\" else attackVector}}</dd>\n<dt>Root cause</dt><dd>{{if rootCause = null then \"not recorded\" else rootCause}}</dd>\n<dt>Scope / impacted assets</dt><dd>{{if impactScope = null then \"not recorded\" else impactScope}}</dd>\n<dt>Dwell time</dt><dd>{{if dwellTimeHours = null then \"not recorded\" else string(dwellTimeHours) + \" hours\"}}</dd>\n<dt>Forensic confidence</dt><dd>{{if analysisConfidence = null then \"not recorded\" else analysisConfidence}}</dd>\n<dt>Containment verified</dt><dd>{{if containmentVerified = true then \"Yes\" else \"No\"}}</dd>\n<dt>Residual risk rating</dt><dd>{{if residualRiskRating = null then \"not recorded\" else residualRiskRating}}</dd>\n<dt>External comms position</dt><dd>{{if externalCommsApproved = null then \"not set\" else externalCommsApproved}}</dd>\n</dl>\n<h4>Note from the CISO</h4>\n<dl>\n<dt>Assessment note</dt><dd>{{if regulatoryAssessmentNote = null then \"none provided\" else regulatoryAssessmentNote}}</dd>\n<dt>Decision record</dt><dd>{{if cisoNotes = null then \"none\" else cisoNotes}}</dd>\n</dl>\n</div>"
+    },
+    { "type": "separator", "id": "reg_sep" },
+    {
+      "type": "checklist",
+      "id": "reg_regulators",
+      "key": "regulators",
+      "label": "Regulators and authorities notified",
+      "values": [
+        { "label": "EU supervisory authority (GDPR Art. 33)", "value": "EU supervisory authority (GDPR Art. 33)" },
+        { "label": "UK Information Commissioner's Office", "value": "UK ICO" },
+        { "label": "US state attorneys general", "value": "US state attorneys general" },
+        { "label": "SEC (Form 8-K Item 1.05)", "value": "SEC (Item 1.05)" },
+        { "label": "HHS Office for Civil Rights (HIPAA)", "value": "HHS OCR (HIPAA)" },
+        { "label": "Sectoral or other regulator", "value": "Sectoral or other regulator" }
+      ],
+      "validate": { "required": true }
     },
     {
-      "type": "textarea",
+      "type": "textfield",
       "id": "reg_jurisdictions",
       "key": "jurisdictions",
-      "label": "Jurisdictions notified"
+      "label": "Specific jurisdictions",
+      "description": "The named jurisdictions covered by the filings above, e.g. \"EU (Ireland lead), US-CA, UK\".",
+      "validate": { "required": true }
+    },
+    {
+      "type": "radio",
+      "id": "reg_subjects",
+      "key": "dataSubjectsNotificationRequired",
+      "label": "Notification of affected data subjects",
+      "values": [
+        { "label": "Required — high risk to individuals", "value": "Required" },
+        { "label": "Not required — risk mitigated", "value": "Not required" },
+        { "label": "Under legal assessment", "value": "Under legal assessment" }
+      ],
+      "validate": { "required": true }
+    },
+    {
+      "type": "textfield",
+      "id": "reg_ref",
+      "key": "filingReference",
+      "label": "Filing reference number",
+      "description": "The reference the authority returned. This is the evidence the filing happened.",
+      "validate": { "required": true },
+      "layout": { "row": "Row_reg_1", "columns": 8 }
+    },
+    {
+      "type": "datetime",
+      "id": "reg_filedat",
+      "key": "filedAt",
+      "subtype": "datetime",
+      "dateLabel": "Filed on",
+      "timeLabel": "Time",
+      "use24h": true,
+      "timeSerializingFormat": "utc_offset",
+      "validate": { "required": true },
+      "layout": { "row": "Row_reg_1", "columns": 8 }
+    },
+    {
+      "type": "textfield",
+      "id": "reg_counsel",
+      "key": "legalCounselApprover",
+      "label": "Legal counsel who approved the filing",
+      "layout": { "row": "Row_reg_2", "columns": 8 }
     },
     {
       "type": "checkbox",
-      "id": "reg_filed",
-      "key": "notificationFiled",
-      "label": "Notifications filed"
+      "id": "reg_le",
+      "key": "lawEnforcementNotified",
+      "label": "Law enforcement notified",
+      "layout": { "row": "Row_reg_2", "columns": 8 }
+    },
+    {
+      "type": "textfield",
+      "id": "reg_leref",
+      "key": "lawEnforcementRef",
+      "label": "Law enforcement case reference",
+      "conditional": { "hide": "=not(lawEnforcementNotified = true)" }
     },
     {
       "type": "textarea",
       "id": "reg_details",
       "key": "notificationDetails",
-      "label": "Details"
+      "label": "What was filed",
+      "description": "Which authority, when, what was disclosed, and what commitments were made. This is the audit record.",
+      "validate": { "required": true, "minLength": 20 }
+    },
+    {
+      "type": "checkbox",
+      "id": "reg_filed",
+      "key": "notificationFiled",
+      "label": "I confirm the required notifications have been filed",
+      "description": "Required. The process continues to the post-incident report from here — if the filings are not complete, do not submit; keep the task open.",
+      "validate": { "required": true }
     }
   ]
 }

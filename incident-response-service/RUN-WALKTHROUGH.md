@@ -106,7 +106,7 @@ drops duplicate deliveries on the floor.
 | 12 | Regulatory required? (`Gateway_Reg`) | exclusive gateway | - | `true` → 12a; else skip to step 13 | - |
 | 12a | File Regulatory Notification (`Task_FileRegNotification`) | 🧑 human task | legal-compliance, `file-regulatory-notification-form`. Non-interrupting 72h timer → 12b | Legal files notices within the 72-hour deadline | (form fields) |
 | 12b | Escalate to CISO (72h) (`Task_EscalateCiso`) | job worker `escalate` | `EscalationWorker` | Fires if the 72h deadline passes | `escalated=true` |
-| 13 | AI Post-Incident Report (`Task_ReportAI`) | AI Agent connector (OpenAI) | - | LLM writes the report from `title`+`severity`+`triageReport`. On failure → boundary → 13a | `postIncidentReport` (LLM text) |
+| 13 | AI Post-Incident Report (`Task_ReportAI`) | AI Agent connector (OpenAI) | - | LLM writes the report from a dossier of every human finding collected so far — forensics, containment, CISO decision, integrity, regulatory position. On failure → boundary → 13a | `postIncidentReport` (LLM text) |
 | 13a | Generate Report (fallback) (`Task_Report`) | job worker `generate-report` | `PostIncidentReportWorker` | Fallback placeholder report if the AI step fails | `postIncidentReport` (placeholder) |
 | 14 | Incident Closure (`Task_Closure`) | 🧑 human task | incident-commander, `incident-closure-form` | Commander reviews the report and closes | (form fields) |
 | 15 | Close Incident (`Task_Close`) | job worker `close-incident` | `CloseIncidentWorker` | Domain: RECOVERING → CLOSED. Ends at "Closed" | - |
@@ -137,6 +137,27 @@ curl http://localhost:8080/incidents/<id>
 For a P1 the order is: Containment Verification and Forensic Analysis (both open at once), then
 CISO Review, Integrity Verification, File Regulatory Notification, Incident Closure. Closing the
 last one lets `close-incident` fire and the status goes to CLOSED.
+
+### What each form shows and asks
+
+Every form opens with a read-only briefing panel of what the process already knows, then asks for
+that role's findings. The panels are what make the chain visible in Tasklist — each step sees the
+step before it.
+
+| Form | Briefing panel shows | Asks for |
+|---|---|---|
+| `handle-isolation-failure` | severity, alert detail, AI triage, and a red banner that automated isolation failed | why it failed, manual containment method, action taken, assets contained, whether the service owner accepted the outage |
+| `containment-verification` | whether isolation was automatic or manual — and if manual, the commander's reason, method and action text | six verification checks, observation window, residual exposure, notes |
+| `forensic-analysis` | the full AI triage report, evidence-collection status, and the SIEM's opening estimates | attack vector, MITRE technique, patient zero, root cause, scope, IOCs, dwell time, data categories, exfiltration status, confirmed record count, analyst confidence, evidence custody |
+| `ciso-review` | the consolidated incident file: forensics, containment and its checks, response actions executed, AI triage | residual-risk rating and acceptance with a written basis, recovery conditions, external-comms position, board notification, decision record |
+| `integrity-verification` | the recovery conditions the CISO imposed, plus root cause and IOCs to sweep for | seven integrity checks, scan tool and reference, services validated, monitoring period |
+| `file-regulatory-notification` | why the filing is required (the DMN inputs that drove it), the deadline, and the CISO's assessment note | named regulators, jurisdictions, data-subject position, filing reference, filing timestamp, counsel approver |
+| `incident-closure` | the post-incident report in full, plus forensics, containment, recovery, the CISO decision and the regulatory outcome | lessons learned, follow-up actions with owners and dates, preventability, control gaps, MTTD/MTTR, review date |
+
+Two forensic fields feed back into the automation: `exfiltrationConfirmed` and `dataCategories`
+recompute `dataExposed`, and `confirmedRecordCount` overrides `recordCount`. Both fall through to the
+existing value when left empty, so completing the form with only `rootCause` and `impactScope`
+behaves exactly as it did before.
 
 ---
 

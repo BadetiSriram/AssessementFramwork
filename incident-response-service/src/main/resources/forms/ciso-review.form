@@ -2,29 +2,125 @@
   "type": "default",
   "id": "ciso-review-form",
   "schemaVersion": 18,
+  "executionPlatform": "Camunda Cloud",
+  "executionPlatformVersion": "8.9.0",
   "components": [
     {
-      "type": "text",
-      "id": "ciso_intro",
-      "text": "## CISO Review\nReview the consolidated incident file, accept residual risk, and authorize recovery."
+      "type": "html",
+      "id": "ciso_brief",
+      "content": "<style>.b{font-size:14px;line-height:1.55;border:1px solid #d0d5dd;border-radius:6px;background:#fcfcfd;padding:14px 16px}.b h3{margin:0 0 8px;font-size:15px}.b h4{margin:16px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#475467;border-top:1px solid #eaecf0;padding-top:10px}.b dl{display:grid;grid-template-columns:200px 1fr;gap:4px 12px;margin:0}.b dt{color:#475467}.b dd{margin:0;font-weight:600;overflow-wrap:anywhere}.b ul{margin:2px 0 0;padding-left:20px}.b li{font-weight:600}.b .rep{white-space:pre-wrap;background:#fff;border:1px solid #eaecf0;border-radius:4px;padding:10px;font-weight:400;margin-top:4px}.sla{border:1px solid #fda29b;background:#fef3f2;border-radius:6px;padding:10px 14px;margin-bottom:10px;font-weight:600;color:#912018}.tag{display:inline-block;padding:1px 9px;border-radius:10px;color:#fff;font-size:12px;font-weight:700}.p1{background:#b42318}.p2{background:#c4320a}.p3{background:#b54708}.p4{background:#475467}.flag{color:#b42318}</style>\n{{#if escalated = true}}<div class=\"sla\">The review SLA for this incident has already been breached and an escalation was raised.</div>{{/if}}\n<div class=\"b\">\n<h3>{{if title = null then \"Untitled incident\" else title}} {{#if severity = \"P1\"}}<span class=\"tag p1\">P1</span>{{/if}}{{#if severity = \"P2\"}}<span class=\"tag p2\">P2</span>{{/if}}{{#if severity = \"P3\"}}<span class=\"tag p3\">P3</span>{{/if}}{{#if severity = \"P4\"}}<span class=\"tag p4\">P4</span>{{/if}}</h3>\n<dl>\n<dt>Incident reference</dt><dd>{{if businessKey = null then \"unknown\" else businessKey}}</dd>\n<dt>Detection source</dt><dd>{{if source = null then \"unknown\" else source}}</dd>\n<dt>Asset criticality</dt><dd>{{if assetCriticality = null then \"unknown\" else assetCriticality}}</dd>\n<dt>Review SLA</dt><dd>{{if slaDuration = null then \"not set\" else slaDuration}}</dd>\n<dt>Stakeholders notified</dt><dd>{{if stakeholdersNotified = true then \"Yes\" else \"No\"}}</dd>\n</dl>\n\n<h4>Forensic findings</h4>\n<dl>\n<dt>Attack vector</dt><dd>{{if attackVector = null then \"not recorded\" else attackVector}}</dd>\n<dt>MITRE ATT&amp;CK technique</dt><dd>{{if mitreTechnique = null then \"not recorded\" else mitreTechnique}}</dd>\n<dt>Patient-zero asset</dt><dd>{{if patientZeroAsset = null then \"not recorded\" else patientZeroAsset}}</dd>\n<dt>Root cause</dt><dd>{{if rootCause = null then \"not recorded\" else rootCause}}</dd>\n<dt>Scope / impacted assets</dt><dd>{{if impactScope = null then \"not recorded\" else impactScope}}</dd>\n<dt>Dwell time</dt><dd>{{if dwellTimeHours = null then \"not recorded\" else string(dwellTimeHours) + \" hours\"}}</dd>\n<dt>Data exfiltration</dt><dd>{{#if exfiltrationConfirmed = \"CONFIRMED\"}}<span class=\"flag\">Confirmed &mdash; data left the environment</span>{{/if}}{{#if exfiltrationConfirmed = \"SUSPECTED\"}}Suspected &mdash; egress not proven{{/if}}{{#if exfiltrationConfirmed = \"RULED_OUT\"}}Ruled out{{/if}}{{#if exfiltrationConfirmed = null}}not recorded{{/if}}</dd>\n<dt>Records affected (confirmed)</dt><dd>{{if recordCount = null then \"unknown\" else recordCount}}</dd>\n<dt>Data categories</dt><dd>{{#if dataCategories != null}}<ul>{{#loop dataCategories}}<li>{{this}}</li>{{/loop}}</ul>{{/if}}{{#if dataCategories = null}}none recorded{{/if}}</dd>\n<dt>Analyst confidence</dt><dd>{{if analysisConfidence = null then \"not recorded\" else analysisConfidence}}</dd>\n<dt>Evidence custodian</dt><dd>{{if evidenceCustodian = null then \"not recorded\" else evidenceCustodian}} {{#if evidenceRefs != null}}({{evidenceRefs}}){{/if}}</dd>\n<dt>Indicators of compromise</dt><dd>{{if iocsObserved = null then \"none recorded\" else iocsObserved}}</dd>\n</dl>\n\n<h4>Containment</h4>\n<dl>\n<dt>How it was contained</dt><dd>{{if manuallyContained = true then \"Manually, after automated isolation failed - \" + (if isolationFailureReason = null then \"reason not recorded\" else isolationFailureReason) else \"Automated isolation by the response platform\"}}</dd>\n{{#if containmentMethod != null}}<dt>Method used</dt><dd>{{containmentMethod}}</dd>{{/if}}\n<dt>Verification checks passed</dt><dd>{{#if containmentChecks != null}}<ul>{{#loop containmentChecks}}<li>{{this}}</li>{{/loop}}</ul>{{/if}}{{#if containmentChecks = null}}none recorded{{/if}}</dd>\n<dt>Observation window</dt><dd>{{if observationWindowMinutes = null then \"not recorded\" else string(observationWindowMinutes) + \" minutes\"}}</dd>\n<dt>Residual exposure</dt><dd>{{if residualExposure = \"Ongoing\" then \"ONGOING - exposure not yet closed\" else if residualExposure = null then \"not recorded\" else residualExposure}}</dd>\n<dt>Verified</dt><dd>{{if containmentVerified = true then \"Yes\" else \"No\"}}</dd>\n<dt>Analyst notes</dt><dd>{{if containmentNotes = null then \"none\" else containmentNotes}}</dd>\n</dl>\n\n<h4>Response actions executed</h4>\n<dl>\n<dt>Activated</dt><dd>{{#if responseActions != null}}<ul>{{#loop responseActions}}<li>{{if this = \"Task_BlockIp\" then \"Block malicious IP / domain\" else if this = \"Task_RevokeCredentials\" then \"Revoke compromised credentials\" else if this = \"Task_DeployPatch\" then \"Deploy emergency patch\" else this}}</li>{{/loop}}</ul>{{/if}}{{#if responseActions = null}}none{{/if}}</dd>\n<dt>Outcome</dt><dd>{{#if ipBlocked = true}}Malicious IP/domain blocked. {{/if}}{{#if credentialsRevoked = true}}Compromised credentials revoked. {{/if}}{{#if patchDeployed = true}}Emergency patch deployed. {{/if}}{{#if not(ipBlocked = true) and not(credentialsRevoked = true) and not(patchDeployed = true)}}No automated action reported complete.{{/if}}</dd>\n</dl>\n\n<h4>AI threat triage {{#if triageSource = \"FALLBACK\"}}(unavailable &mdash; recorded without enrichment){{/if}}</h4>\n<div class=\"rep\">{{if triageReport = null then \"No triage narrative recorded.\" else triageReport}}</div>\n</div>"
+    },
+    { "type": "separator", "id": "ciso_sep" },
+    {
+      "type": "group",
+      "id": "ciso_grp_risk",
+      "label": "Residual risk",
+      "showOutline": true,
+      "components": [
+        {
+          "type": "radio",
+          "id": "ciso_rating",
+          "key": "residualRiskRating",
+          "label": "Residual risk rating after containment",
+          "description": "Your assessment of what remains, given the forensic findings and residual exposure above.",
+          "values": [
+            { "label": "Low", "value": "Low" },
+            { "label": "Medium", "value": "Medium" },
+            { "label": "High", "value": "High" },
+            { "label": "Critical", "value": "Critical" }
+          ],
+          "validate": { "required": true }
+        },
+        {
+          "type": "checkbox",
+          "id": "ciso_residual",
+          "key": "residualRiskAccepted",
+          "label": "I accept the residual risk on behalf of the organisation"
+        },
+        {
+          "type": "textarea",
+          "id": "ciso_rationale",
+          "key": "riskAcceptanceRationale",
+          "label": "Basis for accepting the residual risk",
+          "description": "Required when accepting. This is the audit record of the decision.",
+          "conditional": { "hide": "=not(residualRiskAccepted = true)" },
+          "validate": { "required": true, "minLength": 20 }
+        }
+      ]
     },
     {
-      "type": "checkbox",
-      "id": "ciso_residual",
-      "key": "residualRiskAccepted",
-      "label": "Residual risk accepted"
+      "type": "group",
+      "id": "ciso_grp_recovery",
+      "label": "Recovery authorisation",
+      "showOutline": true,
+      "components": [
+        {
+          "type": "checklist",
+          "id": "ciso_conditions",
+          "key": "recoveryConditions",
+          "label": "Conditions the recovery must satisfy",
+          "description": "Shown to the analyst on the integrity verification step, who has to verify against them.",
+          "values": [
+            { "label": "Restore from a known-good backup only", "value": "Restore from known-good backup only" },
+            { "label": "Rebuild affected hosts rather than clean them", "value": "Rebuild rather than clean" },
+            { "label": "Rotate all privileged credentials before restore", "value": "Rotate privileged credentials first" },
+            { "label": "MFA enforced before accounts are re-enabled", "value": "MFA enforced before re-enable" },
+            { "label": "Enhanced monitoring for 14 days after restore", "value": "Enhanced monitoring for 14 days" }
+          ]
+        },
+        {
+          "type": "checkbox",
+          "id": "ciso_authorize",
+          "key": "recoveryAuthorized",
+          "label": "I authorise recovery to proceed",
+          "description": "Required. Recovery starts as soon as this task completes — if you are not authorising it, do not submit; keep the task open and send the incident back to containment out of band.",
+          "validate": { "required": true }
+        }
+      ]
     },
     {
-      "type": "checkbox",
-      "id": "ciso_authorize",
-      "key": "recoveryAuthorized",
-      "label": "Recovery authorized"
+      "type": "group",
+      "id": "ciso_grp_comms",
+      "label": "Disclosure and escalation",
+      "showOutline": true,
+      "components": [
+        {
+          "type": "radio",
+          "id": "ciso_comms",
+          "key": "externalCommsApproved",
+          "label": "External communications position",
+          "values": [
+            { "label": "Not required", "value": "Not required" },
+            { "label": "Approved — holding statement only", "value": "Approved - holding statement" },
+            { "label": "Approved — full disclosure", "value": "Approved - full disclosure" },
+            { "label": "Withheld pending legal advice", "value": "Withheld pending legal" }
+          ],
+          "validate": { "required": true },
+          "layout": { "row": "Row_ciso_1", "columns": 8 }
+        },
+        {
+          "type": "checkbox",
+          "id": "ciso_board",
+          "key": "boardNotificationRequired",
+          "label": "Board / audit committee notification required",
+          "layout": { "row": "Row_ciso_1", "columns": 8 }
+        },
+        {
+          "type": "textarea",
+          "id": "ciso_regnote",
+          "key": "regulatoryAssessmentNote",
+          "label": "Note for Legal & Compliance",
+          "description": "Read by Legal if the regulatory notification step is reached. Anything that affects the filing position belongs here."
+        }
+      ]
     },
     {
       "type": "textarea",
       "id": "ciso_notes",
       "key": "cisoNotes",
-      "label": "CISO notes"
+      "label": "CISO decision record",
+      "description": "The decision and its reasoning. Carried into the post-incident report.",
+      "validate": { "required": true, "minLength": 20 }
     }
   ]
 }

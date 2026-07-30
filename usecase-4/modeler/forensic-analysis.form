@@ -2,24 +2,185 @@
   "type": "default",
   "id": "forensic-analysis-form",
   "schemaVersion": 18,
+  "executionPlatform": "Camunda Cloud",
+  "executionPlatformVersion": "8.9.0",
   "components": [
     {
-      "type": "text",
-      "id": "fa_intro",
-      "text": "## Forensic Analysis\nAnalyze the collected evidence; establish scope and root cause."
+      "type": "html",
+      "id": "fa_brief",
+      "content": "<style>.b{font-size:14px;line-height:1.55;border:1px solid #d0d5dd;border-radius:6px;background:#fcfcfd;padding:14px 16px}.b h3{margin:0 0 8px;font-size:15px}.b h4{margin:14px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#475467;border-top:1px solid #eaecf0;padding-top:10px}.b dl{display:grid;grid-template-columns:190px 1fr;gap:4px 12px;margin:0}.b dt{color:#475467}.b dd{margin:0;font-weight:600;overflow-wrap:anywhere}.b .rep{white-space:pre-wrap;background:#fff;border:1px solid #eaecf0;border-radius:4px;padding:10px;font-weight:400;margin-top:4px}.note{font-size:13px;color:#475467;margin-top:8px}.tag{display:inline-block;padding:1px 9px;border-radius:10px;color:#fff;font-size:12px;font-weight:700}.p1{background:#b42318}.p2{background:#c4320a}.p3{background:#b54708}.p4{background:#475467}</style>\n<div class=\"b\">\n<h3>{{if title = null then \"Untitled incident\" else title}} {{#if severity = \"P1\"}}<span class=\"tag p1\">P1</span>{{/if}}{{#if severity = \"P2\"}}<span class=\"tag p2\">P2</span>{{/if}}{{#if severity = \"P3\"}}<span class=\"tag p3\">P3</span>{{/if}}{{#if severity = \"P4\"}}<span class=\"tag p4\">P4</span>{{/if}}</h3>\n<dl>\n<dt>Incident reference</dt><dd>{{if businessKey = null then \"unknown\" else businessKey}}</dd>\n<dt>Detection source</dt><dd>{{if source = null then \"unknown\" else source}}</dd>\n<dt>Asset criticality</dt><dd>{{if assetCriticality = null then \"unknown\" else assetCriticality}}</dd>\n<dt>Evidence collection</dt><dd>{{if evidenceCollected = true then \"Complete — evidence is available for analysis\" else \"Not confirmed\"}}</dd>\n<dt>Attack confirmed at triage</dt><dd>{{if attackConfirmed = true then \"Yes\" else \"No\"}}</dd>\n<dt>Data exposed (SIEM estimate)</dt><dd>{{if dataExposed = true then \"Yes\" else \"No\"}}</dd>\n<dt>Records in scope (SIEM estimate)</dt><dd>{{if recordCount = null then \"unknown\" else recordCount}}</dd>\n</dl>\n<h4>AI threat triage {{#if triageSource = \"FALLBACK\"}}(unavailable &mdash; recorded without enrichment){{/if}}</h4>\n<div class=\"rep\">{{if triageReport = null then \"No triage narrative recorded.\" else triageReport}}</div>\n<p class=\"note\">The SIEM estimates above are the inputs the classification decision used. What you confirm below replaces them: your exposure finding and confirmed record count drive the regulatory notification decision later in the process.</p>\n</div>"
+    },
+    { "type": "separator", "id": "fa_sep" },
+    {
+      "type": "group",
+      "id": "fa_grp_attack",
+      "label": "Attack characterisation",
+      "showOutline": true,
+      "components": [
+        {
+          "type": "select",
+          "id": "fa_vector",
+          "key": "attackVector",
+          "label": "Initial attack vector",
+          "values": [
+            { "label": "Phishing / malicious attachment", "value": "Phishing" },
+            { "label": "Stolen or reused credentials", "value": "Stolen credentials" },
+            { "label": "Credential stuffing / brute force", "value": "Credential stuffing" },
+            { "label": "Exploit of a public-facing application", "value": "Exploit of public-facing application" },
+            { "label": "Supply chain / third party", "value": "Supply chain" },
+            { "label": "Insider action", "value": "Insider" },
+            { "label": "Misconfiguration / exposed service", "value": "Misconfiguration" },
+            { "label": "Not established", "value": "Not established" }
+          ],
+          "validate": { "required": true },
+          "layout": { "row": "Row_fa_1", "columns": 8 }
+        },
+        {
+          "type": "textfield",
+          "id": "fa_mitre",
+          "key": "mitreTechnique",
+          "label": "MITRE ATT&CK technique",
+          "description": "e.g. T1566.001",
+          "validate": { "pattern": "^$|^T\\d{4}(\\.\\d{3})?$", "validationType": "custom" },
+          "layout": { "row": "Row_fa_1", "columns": 8 }
+        },
+        {
+          "type": "textfield",
+          "id": "fa_patientzero",
+          "key": "patientZeroAsset",
+          "label": "Patient-zero asset",
+          "description": "Hostname, account or service where the intrusion started.",
+          "validate": { "required": true },
+          "layout": { "row": "Row_fa_2", "columns": 8 }
+        },
+        {
+          "type": "number",
+          "id": "fa_dwell",
+          "key": "dwellTimeHours",
+          "label": "Dwell time (hours)",
+          "description": "First compromise to detection.",
+          "validate": { "min": 0 },
+          "layout": { "row": "Row_fa_2", "columns": 8 }
+        },
+        {
+          "type": "textarea",
+          "id": "fa_rootcause",
+          "key": "rootCause",
+          "label": "Root cause",
+          "description": "The control that failed, not just the symptom. Read by the CISO and included in the post-incident report.",
+          "validate": { "required": true, "minLength": 20 }
+        },
+        {
+          "type": "textarea",
+          "id": "fa_scope",
+          "key": "impactScope",
+          "label": "Scope / impacted assets",
+          "description": "Systems, segments and accounts confirmed in scope, and those ruled out.",
+          "validate": { "required": true, "minLength": 20 }
+        },
+        {
+          "type": "textarea",
+          "id": "fa_iocs",
+          "key": "iocsObserved",
+          "label": "Indicators of compromise observed",
+          "description": "Hashes, IPs, domains, accounts, persistence artefacts — one per line."
+        }
+      ]
     },
     {
-      "type": "textarea",
-      "id": "fa_rootcause",
-      "key": "rootCause",
-      "label": "Root cause",
-      "validate": { "required": true }
+      "type": "group",
+      "id": "fa_grp_data",
+      "label": "Data exposure — drives the regulatory notification decision",
+      "showOutline": true,
+      "components": [
+        {
+          "type": "radio",
+          "id": "fa_exfil",
+          "key": "exfiltrationConfirmed",
+          "label": "Data exfiltration",
+          "values": [
+            { "label": "Confirmed — data left the environment", "value": "CONFIRMED" },
+            { "label": "Suspected — staged or accessed, egress not proven", "value": "SUSPECTED" },
+            { "label": "Ruled out — no data left the environment", "value": "RULED_OUT" }
+          ],
+          "validate": { "required": true }
+        },
+        {
+          "type": "checklist",
+          "id": "fa_categories",
+          "key": "dataCategories",
+          "label": "Data categories involved",
+          "description": "Leave empty only if no regulated data was touched. Selecting any category marks the incident as data-exposed for the regulatory decision.",
+          "values": [
+            { "label": "Personal data (PII)", "value": "Personal data (PII)" },
+            { "label": "Payment card data (PCI)", "value": "Payment card data (PCI)" },
+            { "label": "Health data (PHI)", "value": "Health data (PHI)" },
+            { "label": "Credentials / secrets", "value": "Credentials and secrets" },
+            { "label": "Intellectual property / source code", "value": "Intellectual property" },
+            { "label": "Internal data only, not regulated", "value": "Internal data only" }
+          ]
+        },
+        {
+          "type": "number",
+          "id": "fa_records",
+          "key": "confirmedRecordCount",
+          "label": "Confirmed records affected",
+          "description": "Your forensically confirmed count. Leave empty to keep the SIEM estimate. 500 or more with confirmed exposure triggers regulatory notification.",
+          "validate": { "min": 0 },
+          "layout": { "row": "Row_fa_3", "columns": 8 }
+        },
+        {
+          "type": "radio",
+          "id": "fa_confidence",
+          "key": "analysisConfidence",
+          "label": "Confidence in this analysis",
+          "values": [
+            { "label": "High", "value": "High" },
+            { "label": "Medium", "value": "Medium" },
+            { "label": "Low — further analysis needed", "value": "Low" }
+          ],
+          "validate": { "required": true },
+          "layout": { "row": "Row_fa_3", "columns": 8 }
+        }
+      ]
     },
     {
-      "type": "textarea",
-      "id": "fa_scope",
-      "key": "impactScope",
-      "label": "Scope / impacted assets"
+      "type": "group",
+      "id": "fa_grp_evidence",
+      "label": "Evidence handling",
+      "showOutline": true,
+      "components": [
+        {
+          "type": "textfield",
+          "id": "fa_custodian",
+          "key": "evidenceCustodian",
+          "label": "Evidence custodian",
+          "description": "Who holds the images and logs, for chain of custody.",
+          "layout": { "row": "Row_fa_4", "columns": 8 }
+        },
+        {
+          "type": "textfield",
+          "id": "fa_refs",
+          "key": "evidenceRefs",
+          "label": "Evidence / case references",
+          "description": "Image IDs, ticket or case numbers.",
+          "layout": { "row": "Row_fa_4", "columns": 8 }
+        }
+      ]
+    },
+    {
+      "type": "expression",
+      "id": "fa_expr_exposed",
+      "key": "dataExposed",
+      "computeOn": "presubmit",
+      "expression": "=if exfiltrationConfirmed = \"RULED_OUT\" then false else if dataCategories != null and count(dataCategories) > 0 then true else dataExposed"
+    },
+    {
+      "type": "expression",
+      "id": "fa_expr_records",
+      "key": "recordCount",
+      "computeOn": "presubmit",
+      "expression": "=if confirmedRecordCount != null then confirmedRecordCount else recordCount"
     }
   ]
 }

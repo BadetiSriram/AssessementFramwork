@@ -115,12 +115,22 @@ Then **Folder 4 → "CISO Review (ciso)"**
 
 ```json
 { "completedBy": "ciso",
-  "variables": { "residualRiskAccepted": true, "recoveryAuthorized": true, "cisoNotes": "..." } }
+  "variables": { "residualRiskRating": "Medium", "residualRiskAccepted": true,
+                 "riskAcceptanceRationale": "...", "recoveryAuthorized": true,
+                 "recoveryConditions": ["Restore from known-good backup only", "..."],
+                 "externalCommsApproved": "Approved - holding statement",
+                 "boardNotificationRequired": true, "cisoNotes": "..." } }
 ```
 
-**Why folder 4 rather than folder 3 here:** folder 3's shared body sends all 16 form fields at once
-and lets Camunda ignore the irrelevant ones — convenient, but the audit row then contains fields the
-CISO never saw. Folder 4 sends only this task's real fields.
+**Why folder 4 rather than folder 3 here:** folder 3's shared body sends every form field across all
+seven tasks at once and lets Camunda ignore the irrelevant ones — convenient, but the audit row then
+contains fields the CISO never saw. Folder 4 sends only this task's real fields.
+
+**What the CISO actually sees in Tasklist:** the form leads with the consolidated incident file —
+the forensic findings just submitted (attack vector, MITRE technique, root cause, scope, exfiltration
+status, data categories, confirmed record count), the containment outcome and which verification
+checks passed, and which automated response actions ran. Driving the task through the API skips that
+panel, which is the point of opening it in Tasklist at least once.
 
 **Why the gate exists:** nothing reaches recovery or a regulator until an accountable executive
 signs off.

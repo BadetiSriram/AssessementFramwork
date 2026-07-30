@@ -2,23 +2,76 @@
   "type": "default",
   "id": "integrity-verification-form",
   "schemaVersion": 18,
+  "executionPlatform": "Camunda Cloud",
+  "executionPlatformVersion": "8.9.0",
   "components": [
     {
-      "type": "text",
-      "id": "iv_intro",
-      "text": "## System Integrity Verification\nVerify restored systems are clean and healthy before closure."
+      "type": "html",
+      "id": "iv_brief",
+      "content": "<style>.b{font-size:14px;line-height:1.55;border:1px solid #d0d5dd;border-radius:6px;background:#fcfcfd;padding:14px 16px}.b h3{margin:0 0 8px;font-size:15px}.b h4{margin:16px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#475467;border-top:1px solid #eaecf0;padding-top:10px}.b dl{display:grid;grid-template-columns:200px 1fr;gap:4px 12px;margin:0}.b dt{color:#475467}.b dd{margin:0;font-weight:600;overflow-wrap:anywhere}.b ul{margin:2px 0 0;padding-left:20px}.b li{font-weight:600}.cond{border:1px solid #b2ddff;background:#f5faff;border-radius:6px;padding:10px 14px;margin-bottom:10px;color:#194185}.cond ul{margin:6px 0 0;padding-left:20px}.tag{display:inline-block;padding:1px 9px;border-radius:10px;color:#fff;font-size:12px;font-weight:700}.p1{background:#b42318}.p2{background:#c4320a}.p3{background:#b54708}.p4{background:#475467}</style>\n{{#if recoveryConditions != null}}<div class=\"cond\"><strong>Conditions the CISO attached to this recovery.</strong> Verify against each one before signing off.<ul>{{#loop recoveryConditions}}<li>{{this}}</li>{{/loop}}</ul></div>{{/if}}\n<div class=\"b\">\n<h3>{{if title = null then \"Untitled incident\" else title}} {{#if severity = \"P1\"}}<span class=\"tag p1\">P1</span>{{/if}}{{#if severity = \"P2\"}}<span class=\"tag p2\">P2</span>{{/if}}{{#if severity = \"P3\"}}<span class=\"tag p3\">P3</span>{{/if}}{{#if severity = \"P4\"}}<span class=\"tag p4\">P4</span>{{/if}}</h3>\n<dl>\n<dt>Incident reference</dt><dd>{{if businessKey = null then \"unknown\" else businessKey}}</dd>\n<dt>Services restored</dt><dd>{{if servicesRestored = true then \"Yes - restore job reported complete\" else \"Not confirmed\"}}</dd>\n<dt>Residual risk accepted as</dt><dd>{{if residualRiskRating = null then \"not recorded\" else residualRiskRating}}</dd>\n</dl>\n<h4>What you are verifying against</h4>\n<dl>\n<dt>Root cause</dt><dd>{{if rootCause = null then \"not recorded\" else rootCause}}</dd>\n<dt>Attack vector</dt><dd>{{if attackVector = null then \"not recorded\" else attackVector}}</dd>\n<dt>Patient-zero asset</dt><dd>{{if patientZeroAsset = null then \"not recorded\" else patientZeroAsset}}</dd>\n<dt>Impacted assets</dt><dd>{{if impactScope = null then \"not recorded\" else impactScope}}</dd>\n<dt>Indicators to sweep for</dt><dd>{{if iocsObserved = null then \"none recorded\" else iocsObserved}}</dd>\n<dt>CISO note</dt><dd>{{if cisoNotes = null then \"none\" else cisoNotes}}</dd>\n</dl>\n</div>"
+    },
+    { "type": "separator", "id": "iv_sep" },
+    {
+      "type": "checklist",
+      "id": "iv_checks",
+      "key": "integrityChecks",
+      "label": "Integrity checks passed",
+      "description": "Tick only what you have verified on the restored systems. Anything left unticked is visible to the incident commander at closure.",
+      "values": [
+        { "label": "File hashes match the known-good baseline", "value": "Hashes match known-good baseline" },
+        { "label": "Full EDR / AV scan clean", "value": "Full EDR scan clean" },
+        { "label": "No unauthorised accounts, scheduled tasks or services", "value": "No unauthorised accounts or scheduled tasks" },
+        { "label": "Patch level verified against the exploited weakness", "value": "Patch level verified" },
+        { "label": "Privileged credentials rotated", "value": "Privileged credentials rotated" },
+        { "label": "MFA enforced on the affected accounts", "value": "MFA enforced" },
+        { "label": "Logging and monitoring restored and reporting", "value": "Logging and monitoring restored" }
+      ],
+      "validate": { "required": true }
     },
     {
-      "type": "checkbox",
-      "id": "iv_verified",
-      "key": "integrityVerified",
-      "label": "System integrity verified"
+      "type": "textfield",
+      "id": "iv_tool",
+      "key": "scanTool",
+      "label": "Scanning tool used",
+      "layout": { "row": "Row_iv_1", "columns": 8 }
+    },
+    {
+      "type": "textfield",
+      "id": "iv_ref",
+      "key": "scanReference",
+      "label": "Scan / report reference",
+      "layout": { "row": "Row_iv_1", "columns": 8 }
+    },
+    {
+      "type": "textarea",
+      "id": "iv_services",
+      "key": "servicesValidated",
+      "label": "Services validated back in production",
+      "description": "Which services you confirmed healthy, and how.",
+      "validate": { "required": true, "minLength": 20 }
+    },
+    {
+      "type": "number",
+      "id": "iv_monitor",
+      "key": "monitoringPeriodDays",
+      "label": "Enhanced monitoring period agreed (days)",
+      "validate": { "min": 0 },
+      "layout": { "row": "Row_iv_2", "columns": 6 }
     },
     {
       "type": "textarea",
       "id": "iv_notes",
       "key": "integrityNotes",
-      "label": "Verification notes"
+      "label": "Verification notes",
+      "description": "Evidence for the checks above, and anything the commander should carry into the post-incident review."
+    },
+    {
+      "type": "checkbox",
+      "id": "iv_verified",
+      "key": "integrityVerified",
+      "label": "I confirm the restored systems are clean and healthy",
+      "description": "Required. Recovery closes here — if integrity is not verified, do not submit; keep the task open and re-run the restore.",
+      "validate": { "required": true }
     }
   ]
 }

@@ -198,8 +198,12 @@ the cluster secret **`{{secrets.OPENAI_API_TOKEN}}`**.
 
 A system prompt sets the role ("SOC threat-triage assistant", "incident-response analyst") and the
 shape of the answer; the user prompt injects process variables - `title` and `source` for triage,
-`title`, `severity` and `triageReport` for the report. `resultExpression` drops the text into a
-clean variable rather than leaving the whole connector response lying around.
+and for the report a full dossier of every human finding the process collected: the forensic
+characterisation, the containment outcome and its verification checks, the CISO's residual-risk
+decision and recovery conditions, the integrity result and the regulatory position. Each operand is
+null-guarded, because FEEL's `"text" + null` is `null` and one absent field in a bare concatenation
+would blank the prompt and fire the error boundary for the wrong reason. `resultExpression` drops the
+text into a clean variable rather than leaving the whole connector response lying around.
 
 The important part is the failure handling. `errorExpression` turns any connector failure into
 `AI_STEP_FAILED`, and the boundary event routes to a job-worker fallback. A missing key, a timeout
@@ -419,7 +423,10 @@ Shorten the timers (PT2M or so) if you want to show this firing live in a demo.
   revoke-credentials, deploy-patch, escalate`.
 - **2 DMN:** `incident-classification`, `regulatory-notification` (both FIRST).
 - **7 forms:** containment-verification, handle-isolation-failure, forensic-analysis, ciso-review,
-  integrity-verification, file-regulatory-notification, incident-closure.
+  integrity-verification, file-regulatory-notification, incident-closure. Each leads with a
+  read-only briefing panel of the variables known at that point, so every role sees the previous
+  role's findings; the forensic form also recomputes `dataExposed` and `recordCount` for the
+  regulatory DMN.
 - **Other docs:** `DESIGN-NOTE.md`, `RUN-WALKTHROUGH.md`, `DEMO-SCRIPT.md`, `CHEAT-SHEET.md`, and
   the Postman collection under `postman/`.
 ```

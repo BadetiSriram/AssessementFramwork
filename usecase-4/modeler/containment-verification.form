@@ -2,23 +2,69 @@
   "type": "default",
   "id": "containment-verification-form",
   "schemaVersion": 18,
+  "executionPlatform": "Camunda Cloud",
+  "executionPlatformVersion": "8.9.0",
   "components": [
     {
-      "type": "text",
-      "id": "cv_intro",
-      "text": "## Containment Verification\nConfirm the affected systems have been isolated."
+      "type": "html",
+      "id": "cv_brief",
+      "content": "<style>.b{font-size:14px;line-height:1.55;border:1px solid #d0d5dd;border-radius:6px;background:#fcfcfd;padding:14px 16px}.b h3{margin:0 0 8px;font-size:15px}.b h4{margin:14px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#475467;border-top:1px solid #eaecf0;padding-top:10px}.b dl{display:grid;grid-template-columns:190px 1fr;gap:4px 12px;margin:0}.b dt{color:#475467}.b dd{margin:0;font-weight:600;overflow-wrap:anywhere}.b .rep{white-space:pre-wrap;background:#fff;border:1px solid #eaecf0;border-radius:4px;padding:10px;font-weight:400;margin-top:4px}.ok{border:1px solid #a6f4c5;background:#f6fef9;border-radius:6px;padding:10px 14px;margin-bottom:10px;font-weight:600;color:#05603a}.man{border:1px solid #fec84b;background:#fffaeb;border-radius:6px;padding:10px 14px;margin-bottom:10px;color:#93370d}.man dl{display:grid;grid-template-columns:190px 1fr;gap:4px 12px;margin:6px 0 0}.man dt{font-weight:400}.man dd{margin:0;font-weight:600}.tag{display:inline-block;padding:1px 9px;border-radius:10px;color:#fff;font-size:12px;font-weight:700}.p1{background:#b42318}.p2{background:#c4320a}.p3{background:#b54708}.p4{background:#475467}</style>\n{{#if manuallyContained = true}}<div class=\"man\"><strong>Automated isolation failed &mdash; contained by hand.</strong> Verify the commander's work, not the platform's.<dl>\n<dt>Reason it failed</dt><dd>{{if isolationFailureReason = null then \"not recorded\" else isolationFailureReason}}</dd>\n<dt>Method used</dt><dd>{{if containmentMethod = null then \"not recorded\" else containmentMethod}}</dd>\n<dt>Assets contained</dt><dd>{{if assetsIsolatedCount = null then \"not recorded\" else assetsIsolatedCount}}</dd>\n<dt>Completed at</dt><dd>{{if isolationCompletedAt = null then \"not recorded\" else isolationCompletedAt}}</dd>\n<dt>Action taken</dt><dd>{{if isolationFailureAction = null then \"not recorded\" else isolationFailureAction}}</dd>\n</dl></div>{{/if}}\n{{#if isolated = true}}<div class=\"ok\">Automated isolation succeeded &mdash; the platform reports the affected systems as isolated. Confirm it independently below.</div>{{/if}}\n<div class=\"b\">\n<h3>{{if title = null then \"Untitled incident\" else title}} {{#if severity = \"P1\"}}<span class=\"tag p1\">P1</span>{{/if}}{{#if severity = \"P2\"}}<span class=\"tag p2\">P2</span>{{/if}}{{#if severity = \"P3\"}}<span class=\"tag p3\">P3</span>{{/if}}{{#if severity = \"P4\"}}<span class=\"tag p4\">P4</span>{{/if}}</h3>\n<dl>\n<dt>Incident reference</dt><dd>{{if businessKey = null then \"unknown\" else businessKey}}</dd>\n<dt>Detection source</dt><dd>{{if source = null then \"unknown\" else source}}</dd>\n<dt>Asset criticality</dt><dd>{{if assetCriticality = null then \"unknown\" else assetCriticality}}</dd>\n<dt>Stakeholders notified</dt><dd>{{if stakeholdersNotified = true then \"Yes\" else \"Not yet\"}}</dd>\n<dt>Response actions run</dt><dd>{{if responseActions = null then \"none\" else string(count(responseActions))}} activated{{#if ipBlocked = true}} &middot; IP/domain blocked{{/if}}{{#if credentialsRevoked = true}} &middot; credentials revoked{{/if}}{{#if patchDeployed = true}} &middot; emergency patch deployed{{/if}}</dd>\n</dl>\n<h4>Threat triage {{#if triageSource = \"FALLBACK\"}}(AI unavailable &mdash; recorded without enrichment){{/if}}</h4>\n<div class=\"rep\">{{if triageReport = null then \"No triage narrative recorded.\" else triageReport}}</div>\n</div>"
+    },
+    { "type": "separator", "id": "cv_sep" },
+    {
+      "type": "checklist",
+      "id": "cv_checks",
+      "key": "containmentChecks",
+      "label": "Verification checks passed",
+      "description": "Tick only what you have observed yourself. Anything left unticked is visible to the CISO on the next step.",
+      "values": [
+        { "label": "No further C2 beaconing observed", "value": "No further C2 beaconing" },
+        { "label": "No new process execution on the affected hosts (EDR)", "value": "No new process execution on EDR" },
+        { "label": "Lateral movement paths blocked", "value": "Lateral movement blocked" },
+        { "label": "Egress to known IOCs blocked at the perimeter", "value": "Egress to IOCs blocked" },
+        { "label": "Compromised credentials revoked or rotated", "value": "Credentials revoked" },
+        { "label": "Backups isolated from the affected segment", "value": "Backups isolated" }
+      ],
+      "validate": { "required": true }
     },
     {
-      "type": "checkbox",
-      "id": "cv_verified",
-      "key": "containmentVerified",
-      "label": "Containment verified"
+      "type": "number",
+      "id": "cv_window",
+      "key": "observationWindowMinutes",
+      "label": "Observation window (minutes)",
+      "description": "How long you watched for recurrence before signing off.",
+      "validate": { "required": true, "min": 1 },
+      "layout": { "row": "Row_cv_1", "columns": 6 }
+    },
+    {
+      "type": "radio",
+      "id": "cv_residual",
+      "key": "residualExposure",
+      "label": "Residual exposure after containment",
+      "description": "Feeds the CISO's residual-risk decision and the post-incident report.",
+      "values": [
+        { "label": "None — attacker access fully severed", "value": "None" },
+        { "label": "Limited — some monitored exposure remains", "value": "Limited" },
+        { "label": "Ongoing — exposure not yet closed", "value": "Ongoing" }
+      ],
+      "validate": { "required": true },
+      "layout": { "row": "Row_cv_1", "columns": 10 }
     },
     {
       "type": "textarea",
       "id": "cv_notes",
       "key": "containmentNotes",
-      "label": "Verification notes"
+      "label": "Verification notes",
+      "description": "Evidence for the checks above: what you looked at, and anything still outstanding.",
+      "validate": { "required": true, "minLength": 20 }
+    },
+    {
+      "type": "checkbox",
+      "id": "cv_verified",
+      "key": "containmentVerified",
+      "label": "I confirm containment is verified",
+      "description": "Required. The containment stream closes here — if containment is not verified, do not submit; keep the task open and re-contain first.",
+      "validate": { "required": true }
     }
   ]
 }
